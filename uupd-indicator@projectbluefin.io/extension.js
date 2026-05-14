@@ -25,6 +25,7 @@ const DBUS_NAME = "org.freedesktop.systemd1";
 const DBUS_PATH = "/org/freedesktop/systemd1/unit/uupd_2eservice";
 const DBUS_INTERFACE = "org.freedesktop.systemd1.Unit";
 const DBUS_TIMER_PATH = "/org/freedesktop/systemd1/unit/uupd_2etimer";
+// Bluefin exposes uupd.timer and uupd.service as system units.
 const DBUS_CONNECTION = Gio.DBus.system;
 const DEBUG = false;
 

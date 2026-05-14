@@ -154,7 +154,7 @@ journalctl -f -o cat /usr/bin/gnome-shell | grep -Ei 'uupd|JS ERROR|extension'
 
 ### systemd / D-Bus checks
 
-The GNOME 50 host diagnostics in `host-diagnostics-20260514-111104.md` show that `uupd.timer` and `uupd.service` are real system units on Bluefin, while the user-unit checks return `LoadState=not-found`. The extension therefore keeps using `Gio.DBus.system` to talk to `org.freedesktop.systemd1`.
+Host diagnostics on Bluefin GNOME 50 confirmed that `uupd.timer` and `uupd.service` are system units, while user-unit checks returned `LoadState=not-found`. The extension therefore uses `Gio.DBus.system`.
 
 Primary checks:
 
@@ -180,13 +180,9 @@ Run:
 ./scripts/collect-host-diagnostics.sh
 ```
 
-The report is written to:
+The report is written to a timestamped Markdown file in the repository root.
 
-```text
-host-diagnostics-YYYYMMDD-HHMMSS.md
-```
-
-The report now also states whether the installed extension path resolves to this checkout, so a successful smoke test is not mistaken for another installed copy.
+The report also states whether the installed extension path resolves to this checkout, so a successful smoke test is not mistaken for another installed copy.
 
 ### Warning
 

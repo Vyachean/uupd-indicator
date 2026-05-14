@@ -102,7 +102,9 @@ if [ "$SOURCE_MATCH" != "yes" ]; then
 fi
 if [ "$INSTALL_SYMLINK" = "1" ]; then
   write ""
-  write "INSTALL_SYMLINK=1 was set, so the installed extension path was replaced with a symlink to this checkout before collecting the rest of the report."
+  write "WARNING: INSTALL_SYMLINK=1 changed the installed extension path before this smoke test."
+  write "GNOME Shell may still have previously loaded JS modules in memory."
+  write "For reliable runtime verification, log out and log back in, then rerun this script without INSTALL_SYMLINK=1."
 fi
 
 section "Enable/disable smoke test"
