@@ -8,6 +8,26 @@
 ![detail](/screenshots/screenshot2.png)
 ![on click](/screenshots/screenshot3.png)
 
+## Why this exists
+
+Bluefin and other Universal Blue systems are designed around quiet, automatic background updates. This is intentional: routine system maintenance should happen without asking the user to manually manage updates.
+
+However, invisible background work can be confusing on laptops. Automatic updates may temporarily use CPU, disk, network, and battery. When a laptop suddenly becomes warm, noisy, slower, or starts draining battery without any visible reason, the user has no simple way to tell whether the system is doing expected maintenance or whether something is wrong.
+
+`uupd-indicator` exists to make that specific background activity visible.
+
+It does not manage updates, trigger updates, block updates, or ask the user to take action. It only reflects the state of the existing `uupd.service` / `uupd.timer` workflow in the GNOME top bar.
+
+The goal is deliberately modest:
+
+- explain otherwise invisible update-related load;
+- reduce confusion when a laptop heats up, slows down, or uses more battery during automatic maintenance;
+- show when automatic update work is running or has failed;
+- avoid requiring terminal commands just to understand what the system is doing;
+- stay passive and avoid interrupting the user.
+
+This keeps Bluefin's quiet automatic update model intact while giving users who want it a small amount of operational context.
+
 ## Requirements
 
 - GNOME Shell 49 or 50
@@ -47,6 +67,8 @@ This removes only the installed copy from your user extensions directory. It doe
 ## Usage
 
 The extension watches `uupd.service` and `uupd.timer` over D-Bus. The default visibility mode is `Auto`, which keeps the current top-bar behavior: hidden while inactive, pulsing while updates run, and a warning icon when the last automatic run fails.
+
+When the indicator is visible, update-related background work may be one reason for temporary CPU, disk, network, battery, or thermal activity.
 
 An optional `Always` visibility mode is available in the extension preferences. In that mode the indicator remains visible in the top bar even while `uupd.service` is inactive, using a neutral `view-refresh-symbolic` idle icon without fake progress percentages.
 
