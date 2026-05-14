@@ -368,5 +368,3 @@ export const UupdIndicator = GObject.registerClass(
     }
   }
 );
-
-export { VISIBILITY_MODE_ALWAYS };
