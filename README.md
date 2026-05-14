@@ -6,9 +6,9 @@ A GNOME Shell extension that shows a pulsing download indicator when system upda
 
 - Shows a pulsing download icon in the system tray when updates are running
 - Only active when automatic updates are enabled (`ujust toggle-updates`)
-- Monitors `uupd.service` state via D-Bus
+- Monitors system `uupd.service` and `uupd.timer` units through the systemd D-Bus API on the system bus
 - Smooth opacity-based pulsing animation
-- Works with GNOME Shell 49
+- Metadata declares GNOME Shell 49 and 50 support
 
 [screeencast](https://github.com/user-attachments/assets/bfa39984-85b9-4b1c-b3bd-faae13dd6f76)
 
@@ -33,7 +33,7 @@ cp -r uupd-indicator@projectbluefin.io ~/.local/share/gnome-shell/extensions/
 chmod 644 ~/.local/share/gnome-shell/extensions/uupd-indicator@projectbluefin.io/*
 ```
 
-4. Log out and log back in (or restart GNOME Shell with `Alt+F2`, then type `r` and press Enter on X11)
+4. Log out and log back in
 
 5. Enable the extension:
 
@@ -47,7 +47,7 @@ gnome-extensions enable uupd-indicator@projectbluefin.io
 
 ## Usage
 
-The extension automatically monitors the `uupd.service` and `uupd.timer` systemd units.
+The extension automatically monitors the system `uupd.service` and `uupd.timer` units.
 
 ### Enable Automatic Updates
 
@@ -71,16 +71,13 @@ When automatic updates are disabled, the extension will hide the indicator.
 
 ## Requirements
 
-- GNOME Shell 49
+- GNOME Shell 49 or 50
 - Universal Blue or any system using `uupd.service` and `uupd.timer`
 - systemd
 
-## Development
+## Development / verification
 
-The extension monitors the following systemd units via D-Bus:
-
-- `uupd.service` - The update service (shows indicator when active/activating)
-- `uupd.timer` - The timer that triggers automatic updates (extension only shows when enabled)
+Development and verification notes, including GNOME 50 host checks, CI coverage, smoke-test limitations, and manual D-Bus/systemd debugging commands, live in [docs/gnome50-verification.md](docs/gnome50-verification.md).
 
 ### File Structure
 
@@ -101,8 +98,7 @@ uupd-indicator@projectbluefin.io/
 
 ### Icon not animating
 
-- Verify that automatic updates are enabled: `systemctl --user is-enabled uupd.timer`
-- Check that updates are actually running: `systemctl --user status uupd.service`
+- Verify that automatic updates are enabled and that the system units are present on the host.
 - View extension logs: `journalctl /usr/bin/gnome-shell | grep uupd-indicator`
 
 ### Extension crashes or errors
@@ -117,6 +113,7 @@ journalctl /usr/bin/gnome-shell -f
 ```bash
 systemctl list-timers --all uupd.timer
 ```
+
 
 ## License
 
