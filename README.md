@@ -188,7 +188,9 @@ The report also states whether the installed extension path resolves to this che
 
 ## CI
 
-GitHub Actions runs the required static checks on every `push` and `pull_request`, and exposes a manual smoke workflow path through `workflow_dispatch`.
+GitHub Actions runs the required static checks on every `push` and `pull_request`.
+
+The Fedora smoke path is separate and experimental for now. It runs through `workflow_dispatch` first so the repository does not silently lose smoke coverage while the hosted-container behavior is still being validated.
 
 Static CI verifies:
 
@@ -197,17 +199,20 @@ Static CI verifies:
 - the extension tree does not contain known debug or stale legacy symbols
 - `gnome-extensions pack` can build a packaged zip
 
-Smoke CI is intentionally narrower:
+Fedora smoke CI is intentionally narrower:
 
 - it runs through `gnome-shell-test-tool` against the packaged extension zip
+- it targets a Fedora GNOME userspace in a GitHub Actions job container instead of the default Ubuntu host image
 - it drives only fake provider state from `tests/smoke-extension.js`
 - it does not start `uupd.service`
 - it does not touch real systemd unit state
 - it does not prove real Bluefin `uupd` integration
 
-Hosted GitHub runners are not currently assumed to provide GNOME Shell 50 `gnome-shell-test-tool --extension` support reliably. Because of that, the smoke job is manual for now and fails explicitly when the runner only has older tooling. Once a GNOME 50-capable hosted or self-hosted runner is confirmed, that smoke job can be promoted to a required check.
+The Fedora smoke job prints `gnome-shell --version`, prints `gnome-shell-test-tool --help`, and fails explicitly when the tool does not expose `--extension`. If that path proves reliable in GitHub Actions, it can be promoted to a required `pull_request` check. Until then it remains non-required on purpose.
 
-Real host integration remains the responsibility of `./scripts/collect-host-diagnostics.sh`. Real visual behavior during an actual update window still requires natural observation on a real host or a separate manual host check.
+Hosted GitHub runners do not provide a real Bluefin desktop session, a real GNOME login lifecycle, or real `uupd` integration. CI never starts `uupd.service`.
+
+Real host integration remains the responsibility of `./scripts/collect-host-diagnostics.sh`. Real visual behavior during an actual update window still requires natural observation on a real host or a separate self-hosted Bluefin / GNOME 50 runner.
 
 ## Verification
 

@@ -35,26 +35,88 @@ jobs:
       - name: Pack extension zip
         run: gnome-extensions pack uupd-indicator@projectbluefin.io --force
 
-  smoke:
+  smoke-fedora:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    continue-on-error: true
+    container:
+      image: fedora:44
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Install GNOME Shell test tooling
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gnome-shell
+          dnf install -y \
+            findutils \
+            gnome-shell \
+            grep \
+            tar
 
-      - name: Probe gnome-shell-test-tool support
+      - name: Probe GNOME Shell tooling
         run: |
-          gnome-shell-test-tool --version
+          gnome-shell --version
+          gnome-shell-test-tool --help
           if ! gnome-shell-test-tool --help 2>&1 | grep -F -- "--extension" >/dev/null; then
-            echo "Hosted runner smoke test cannot run: gnome-shell-test-tool is present, but this build does not support --extension."
+            echo "Fedora smoke test cannot run: gnome-shell-test-tool is present, but this build does not support --extension."
             echo "A GNOME Shell 50 or newer test environment is required for packaged-extension smoke testing."
             exit 1
           fi
 
       - name: Run packaged-extension smoke test
         run: ./scripts/run-smoke-test.sh
+
+  # Enable this fallback only if fedora:44 stops being suitable on GitHub-hosted
+  # runners and you need a faster way to probe newer GNOME Shell tooling.
+  #
+  # smoke-fedora-rawhide:
+  #   if: github.event_name == 'workflow_dispatch'
+  #   runs-on: ubuntu-latest
+  #   continue-on-error: true
+  #   container:
+  #     image: fedora:rawhide
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   steps:
+  #     - name: Check out repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Install GNOME Shell test tooling
+  #       run: |
+  #         dnf install -y \
+  #           findutils \
+  #           gnome-shell \
+  #           grep \
+  #           tar
+  #
+  #     - name: Probe GNOME Shell tooling
+  #       run: |
+  #         gnome-shell --version
+  #         gnome-shell-test-tool --help
+  #         if ! gnome-shell-test-tool --help 2>&1 | grep -F -- "--extension" >/dev/null; then
+  #           echo "Fedora Rawhide smoke test cannot run: gnome-shell-test-tool is present, but this build does not support --extension."
+  #           exit 1
+  #         fi
+  #
+  #     - name: Run packaged-extension smoke test
+  #       run: ./scripts/run-smoke-test.sh
+
+  # Self-hosted template for real host integration checks. Do not enable as a
+  # required check until the runner exists and is stable.
+  #
+  # smoke-bluefin-host:
+  #   if: github.event_name == 'workflow_dispatch'
+  #   runs-on: [self-hosted, linux, gnome-50, bluefin]
+  #   steps:
+  #     - name: Check out repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Run packaged-extension smoke test
+  #       run: ./scripts/run-smoke-test.sh
+  #
+  #     - name: Collect host diagnostics
+  #       run: ./scripts/collect-host-diagnostics.sh
