@@ -76,12 +76,12 @@ case "$ACTION" in
     ;;
   update)
     require_repo_root
-    copy_extension_files
     if has_gnome_extensions; then
       if gnome-extensions disable "$UUID" >/dev/null 2>&1; then
         :
       fi
     fi
+    copy_extension_files
     enable_extension "Updated"
     ;;
   enable)

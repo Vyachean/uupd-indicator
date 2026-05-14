@@ -2,7 +2,7 @@
 
 `uupd-indicator` is a GNOME Shell extension that shows a pulsing download indicator when `uupd.service` is downloading or applying system updates. It is intended for Universal Blue, Bluefin, and compatible systems that expose `uupd.service` and `uupd.timer`.
 
-[screeencast](https://github.com/user-attachments/assets/bfa39984-85b9-4b1c-b3bd-faae13dd6f76)
+[screencast](https://github.com/user-attachments/assets/bfa39984-85b9-4b1c-b3bd-faae13dd6f76)
 
 ![total bar](/screenshots/screenshot1.png)
 ![detail](/screenshots/screenshot2.png)
@@ -48,14 +48,6 @@ This removes only the installed copy from your user extensions directory. It doe
 
 The extension watches `uupd.service` and `uupd.timer`. When automatic updates are enabled and an update is running, GNOME Shell shows the pulsing indicator in the top bar.
 
-## Enable automatic updates
-
-```bash
-ujust toggle-updates
-```
-
-Run the same command again to disable automatic updates.
-
 ## Status and logs
 
 Check whether the extension is installed and enabled, and whether the relevant systemd units exist:
@@ -78,11 +70,13 @@ just
 
 ## Automatic updates
 
-Enable the host update timer with:
+Enable or disable the host update timer with:
 
 ```bash
 ujust toggle-updates
 ```
+
+Run the same command again to toggle automatic updates off.
 
 The extension does not update itself automatically. To update the installed extension files after new commits are pulled, run:
 
