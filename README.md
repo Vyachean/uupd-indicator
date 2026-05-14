@@ -48,6 +48,14 @@ This removes only the installed copy from your user extensions directory. It doe
 
 The extension watches `uupd.service` and `uupd.timer`. When automatic updates are enabled and an update is running, GNOME Shell shows the pulsing indicator in the top bar.
 
+## UX and status model
+
+The extension shows the current systemd unit state that is available over D-Bus. It does not parse `journalctl`, it does not shell out for normal UI updates, and it does not invent exact package-level progress.
+
+Because `uupd` does not currently expose exact update progress to the extension, the indicator can show that an automatic update is running, failed, or is scheduled through `uupd.timer`, but it cannot show an exact percentage.
+
+If the last automatic `uupd.service` run fails, the top bar shows a warning icon instead of silently hiding the problem. The popup includes the systemd result and exit status when systemd exposes them.
+
 ## Status and logs
 
 Check whether the extension is installed and enabled, and whether the relevant systemd units exist:

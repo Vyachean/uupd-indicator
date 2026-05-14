@@ -35,6 +35,8 @@ journalctl -f -o cat /usr/bin/gnome-shell | grep -Ei 'uupd|JS ERROR|extension'
 
 Host diagnostics on Bluefin GNOME 50 confirmed that `uupd.timer` and `uupd.service` are system units, while user-unit checks returned `LoadState=not-found`.
 
+The extension intentionally reflects only systemd state that is available over D-Bus. Without changes in `uupd`, exact package-level progress or percentages are not available to the Shell extension. Failed automatic runs are surfaced as a warning icon, using `uupd.service` state plus best-effort `Result` and `ExecMainStatus` details when systemd exposes them.
+
 Primary checks:
 
 ```bash
@@ -123,6 +125,8 @@ The smoke test:
 - drives the indicator through fake provider state only
 
 The smoke test does not start `uupd.service` and does not trigger real system updates. It verifies extension loading, indicator registration, visibility changes for fake `active` / `activating` / `inactive` states, and actor cleanup on disable.
+
+It also verifies the fake failed-state warning path, session-only dismiss behavior, and timeout cleanup for the optional short-lived completion state.
 
 Real visual behavior during an actual host update still needs natural observation during a real update window or a separate manual runtime check.
 
