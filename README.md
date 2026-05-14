@@ -82,6 +82,8 @@ The extension monitors the following systemd units via the system bus:
 - `uupd.service` - The update service (shows indicator when active/activating)
 - `uupd.timer` - The timer that triggers automatic updates (extension only shows when enabled)
 
+Production state reads are isolated in `SystemdUupdStateProvider`, while `UupdIndicator` owns the panel actor behavior. Smoke tests switch the actor to a fake provider state path, so they verify visibility and cleanup without starting `uupd.service` or triggering real system updates.
+
 ### File Structure
 
 ```
@@ -183,6 +185,42 @@ Run:
 The report is written to a timestamped Markdown file in the repository root.
 
 The report also states whether the installed extension path resolves to this checkout, so a successful smoke test is not mistaken for another installed copy.
+
+## Verification
+
+### Static checks
+
+```bash
+python3 -m json.tool uupd-indicator@projectbluefin.io/metadata.json
+bash -n scripts/collect-host-diagnostics.sh
+bash -n scripts/run-smoke-test.sh
+grep -R "console.log\|_iconToggle\|GETTEXT_DOMAIN\|DBUS_MANAGER_INTERFACE" -n uupd-indicator@projectbluefin.io || true
+```
+
+### Host diagnostics
+
+```bash
+./scripts/collect-host-diagnostics.sh
+```
+
+This remains the source of truth for real host systemd and D-Bus availability in the logged-in GNOME session.
+
+### Automated smoke test
+
+```bash
+./scripts/run-smoke-test.sh
+```
+
+The smoke test:
+
+- builds a packaged extension zip with `gnome-extensions pack`
+- starts a separate `gnome-shell-test-tool` environment instead of restarting the real desktop session
+- installs the packaged zip into that test environment
+- drives the indicator through fake provider state only
+
+The smoke test does not start `uupd.service` and does not trigger real system updates. It verifies extension loading, indicator registration, visibility changes for fake `active` / `activating` / `inactive` states, and actor cleanup on disable.
+
+Real visual behavior during an actual host update still needs natural observation during a real update window or a separate manual runtime check.
 
 ### Warning
 

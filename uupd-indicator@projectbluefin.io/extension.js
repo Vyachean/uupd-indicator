@@ -40,42 +40,86 @@ function unpackMaybeVariant(value) {
     : value;
 }
 
-const UupdIndicator = GObject.registerClass(
+const StateProvider = GObject.registerClass(
   {
-    GTypeName: "UupdIndicator",
+    Signals: {
+      "state-changed": {},
+    },
   },
-  class UupdIndicator extends PanelMenu.Button {
+  class StateProvider extends GObject.Object {
     _init() {
-      super._init(0.0, _("Universal Blue Update Indicator"));
-      this._destroyed = false;
-      this._initCancellable = new Gio.Cancellable();
-      this._proxy = null;
-      this._timerProxy = null;
-      this._propertiesChangedId = null;
-      this._timerPropertiesChangedId = null;
-      this._timerEnabled = false;
-      this._serviceState = null;
-      this._pulseDirection = -1;
-      this._pulseOpacity = 255;
-      this._iconAnimation = null;
-
-      this._icon = new St.Icon({
-        icon_name: "folder-download-symbolic",
-        style_class: "system-status-icon",
-      });
-      this.add_child(this._icon);
-
-      let msgUpdateItem = new PopupMenu.PopupMenuItem(
-        _("System update in progress...")
-      );
-      msgUpdateItem.setSensitive(false);
-      this.menu.addMenuItem(msgUpdateItem);
-
-      this.hide();
-      this._initDBusProxy();
+      super._init();
+      this._state = {
+        timerEnabled: false,
+        serviceState: null,
+      };
     }
 
-    _initDBusProxy() {
+    start() {
+    }
+
+    destroy() {
+    }
+
+    getState() {
+      return { ...this._state };
+    }
+
+    _setState(nextState) {
+      const timerEnabled = Boolean(nextState.timerEnabled);
+      const serviceState = nextState.serviceState ?? null;
+
+      if (this._state.timerEnabled === timerEnabled
+        && this._state.serviceState === serviceState) {
+        return;
+      }
+
+      this._state = {
+        timerEnabled,
+        serviceState,
+      };
+      this.emit("state-changed");
+    }
+  }
+);
+
+const SystemdUupdStateProvider = GObject.registerClass(
+  class SystemdUupdStateProvider extends StateProvider {
+    _init() {
+      super._init();
+      this._destroyed = false;
+      this._initCancellable = new Gio.Cancellable();
+      this._serviceProxy = null;
+      this._timerProxy = null;
+      this._servicePropertiesChangedId = null;
+      this._timerPropertiesChangedId = null;
+    }
+
+    start() {
+      this._initTimerProxy();
+      this._initServiceProxy();
+    }
+
+    destroy() {
+      this._destroyed = true;
+      this._initCancellable?.cancel();
+
+      if (this._servicePropertiesChangedId && this._serviceProxy) {
+        this._serviceProxy.disconnect(this._servicePropertiesChangedId);
+        this._servicePropertiesChangedId = null;
+      }
+
+      if (this._timerPropertiesChangedId && this._timerProxy) {
+        this._timerProxy.disconnect(this._timerPropertiesChangedId);
+        this._timerPropertiesChangedId = null;
+      }
+
+      this._initCancellable = null;
+      this._serviceProxy = null;
+      this._timerProxy = null;
+    }
+
+    _initTimerProxy() {
       this._timerProxy = new Gio.DBusProxy({
         g_connection: DBUS_CONNECTION,
         g_name: DBUS_NAME,
@@ -97,27 +141,30 @@ const UupdIndicator = GObject.registerClass(
               this._onTimerPropertiesChanged.bind(this)
             );
             this._refreshTimerState();
-            this._updateIndicatorState();
           } catch (e) {
             if (this._isCancelledError(e))
               return;
 
             console.warn(`[uupd-indicator] Failed to initialize timer proxy: ${e.message}`);
             this._timerProxy = null;
-            this._timerEnabled = false;
-            this._updateIndicatorState();
+            this._setState({
+              ...this.getState(),
+              timerEnabled: false,
+            });
           }
         }
       );
+    }
 
-      this._proxy = new Gio.DBusProxy({
+    _initServiceProxy() {
+      this._serviceProxy = new Gio.DBusProxy({
         g_connection: DBUS_CONNECTION,
         g_name: DBUS_NAME,
         g_object_path: DBUS_PATH,
         g_interface_name: DBUS_INTERFACE,
       });
 
-      this._proxy.init_async(
+      this._serviceProxy.init_async(
         GLib.PRIORITY_DEFAULT,
         this._initCancellable,
         (proxy, result) => {
@@ -126,20 +173,21 @@ const UupdIndicator = GObject.registerClass(
 
           try {
             proxy.init_finish(result);
-            this._propertiesChangedId = this._proxy.connect(
+            this._servicePropertiesChangedId = this._serviceProxy.connect(
               "g-properties-changed",
-              this._onPropertiesChanged.bind(this)
+              this._onServicePropertiesChanged.bind(this)
             );
             this._refreshServiceState();
-            this._updateIndicatorState();
           } catch (e) {
             if (this._isCancelledError(e))
               return;
 
             console.warn(`[uupd-indicator] Failed to initialize service proxy: ${e.message}`);
-            this._proxy = null;
-            this._serviceState = null;
-            this._updateIndicatorState();
+            this._serviceProxy = null;
+            this._setState({
+              ...this.getState(),
+              serviceState: null,
+            });
           }
         }
       );
@@ -152,19 +200,32 @@ const UupdIndicator = GObject.registerClass(
 
     _refreshTimerState() {
       if (!this._timerProxy)
-        return false;
+        return;
 
       const unitFileState = this._timerProxy.get_cached_property("UnitFileState");
+      const timerEnabled = unitFileState?.deep_unpack() === "enabled";
 
-      if (!unitFileState) {
-        this._timerEnabled = false;
-        return false;
-      }
+      debug(`Timer state: ${unitFileState?.deep_unpack?.() ?? "unknown"}`);
+      this._setState({
+        ...this.getState(),
+        timerEnabled,
+      });
+    }
 
-      const state = unitFileState.deep_unpack();
-      this._timerEnabled = state === "enabled";
-      debug(`Timer state: ${state}`);
-      return true;
+    _refreshServiceState() {
+      if (!this._serviceProxy)
+        return;
+
+      const activeState = this._serviceProxy.get_cached_property("ActiveState");
+      const serviceState = unpackMaybeVariant(activeState);
+
+      if (serviceState)
+        debug(`Service state: ${serviceState}`);
+
+      this._setState({
+        ...this.getState(),
+        serviceState,
+      });
     }
 
     _onTimerPropertiesChanged() {
@@ -172,30 +233,97 @@ const UupdIndicator = GObject.registerClass(
         return;
 
       this._refreshTimerState();
-      this._updateIndicatorState();
     }
 
-    _refreshServiceState() {
-      if (!this._proxy)
-        return false;
-
-      const activeState = this._proxy.get_cached_property("ActiveState");
-      this._serviceState = unpackMaybeVariant(activeState);
-      if (this._serviceState)
-        debug(`Service state: ${this._serviceState}`);
-      return activeState !== null;
-    }
-
-    _onPropertiesChanged(_proxy, changed) {
+    _onServicePropertiesChanged(_proxy, changed) {
       if (this._destroyed)
         return;
 
       const changedProps = changed.deep_unpack();
 
       if ("ActiveState" in changedProps) {
-        this._serviceState = unpackMaybeVariant(changedProps.ActiveState);
-        this._updateIndicatorState();
+        this._setState({
+          ...this.getState(),
+          serviceState: unpackMaybeVariant(changedProps.ActiveState),
+        });
       }
+    }
+  }
+);
+
+const FakeUupdStateProvider = GObject.registerClass(
+  class FakeUupdStateProvider extends StateProvider {
+    setState(nextState) {
+      this._setState({
+        ...this.getState(),
+        ...nextState,
+      });
+    }
+  }
+);
+
+const UupdIndicator = GObject.registerClass(
+  {
+    GTypeName: "UupdIndicator",
+  },
+  class UupdIndicator extends PanelMenu.Button {
+    _init(provider = new SystemdUupdStateProvider()) {
+      super._init(0.0, _("Universal Blue Update Indicator"));
+      this._destroyed = false;
+      this._provider = null;
+      this._providerChangedId = null;
+      this._testProvider = null;
+      this._pulseDirection = -1;
+      this._pulseOpacity = 255;
+      this._iconAnimation = null;
+
+      this._icon = new St.Icon({
+        icon_name: "folder-download-symbolic",
+        style_class: "system-status-icon",
+      });
+      this.add_child(this._icon);
+
+      let msgUpdateItem = new PopupMenu.PopupMenuItem(
+        _("System update in progress...")
+      );
+      msgUpdateItem.setSensitive(false);
+      this.menu.addMenuItem(msgUpdateItem);
+
+      this.hide();
+      this._setProvider(provider);
+    }
+
+    _setProvider(provider) {
+      if (this._providerChangedId && this._provider) {
+        this._provider.disconnect(this._providerChangedId);
+        this._providerChangedId = null;
+      }
+
+      this._provider?.destroy();
+      this._provider = provider;
+      this._providerChangedId = this._provider.connect(
+        "state-changed",
+        () => this._updateIndicatorState()
+      );
+      this._provider.start();
+      this._updateIndicatorState();
+    }
+
+    setStateForTesting(nextState) {
+      if (!this._testProvider) {
+        this._testProvider = new FakeUupdStateProvider();
+        this._setProvider(this._testProvider);
+      }
+
+      this._testProvider.setState(nextState);
+    }
+
+    clearTestState() {
+      if (!this._testProvider)
+        return;
+
+      this._testProvider = null;
+      this._setProvider(new SystemdUupdStateProvider());
     }
 
     _startIconAnimation() {
@@ -240,19 +368,24 @@ const UupdIndicator = GObject.registerClass(
       if (this._destroyed)
         return;
 
-      if (!this._timerEnabled) {
+      const { timerEnabled, serviceState } = this._provider?.getState() ?? {
+        timerEnabled: false,
+        serviceState: null,
+      };
+
+      if (!timerEnabled) {
         this._stopIconAnimation();
         this.hide();
         return;
       }
 
-      if (!this._serviceState) {
+      if (!serviceState) {
         this._stopIconAnimation();
         this.hide();
         return;
       }
 
-      if (this._serviceState === "active" || this._serviceState === "activating") {
+      if (serviceState === "active" || serviceState === "activating") {
         this.show();
         this._startIconAnimation();
       } else {
@@ -263,22 +396,16 @@ const UupdIndicator = GObject.registerClass(
 
     destroy() {
       this._destroyed = true;
-      this._initCancellable?.cancel();
       this._stopIconAnimation();
 
-      if (this._propertiesChangedId && this._proxy) {
-        this._proxy.disconnect(this._propertiesChangedId);
-        this._propertiesChangedId = null;
+      if (this._providerChangedId && this._provider) {
+        this._provider.disconnect(this._providerChangedId);
+        this._providerChangedId = null;
       }
 
-      if (this._timerPropertiesChangedId && this._timerProxy) {
-        this._timerProxy.disconnect(this._timerPropertiesChangedId);
-        this._timerPropertiesChangedId = null;
-      }
-
-      this._initCancellable = null;
-      this._proxy = null;
-      this._timerProxy = null;
+      this._provider?.destroy();
+      this._provider = null;
+      this._testProvider = null;
       super.destroy();
     }
   }
