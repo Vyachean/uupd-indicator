@@ -36,7 +36,7 @@ jobs:
         run: gnome-extensions pack uupd-indicator@projectbluefin.io --force
 
   smoke-fedora:
-    if: github.event_name == 'workflow_dispatch'
+    name: smoke-fedora (experimental, non-blocking)
     runs-on: ubuntu-latest
     continue-on-error: true
     container:
