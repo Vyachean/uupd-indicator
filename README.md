@@ -1,14 +1,6 @@
 # Universal Blue Update Indicator
 
-A GNOME Shell extension that shows a pulsing download indicator when system updates are being applied via `uupd.service` on Universal Blue systems.
-
-## Features
-
-- Shows a pulsing download icon in the system tray when updates are running
-- Only active when automatic updates are enabled (`ujust toggle-updates`)
-- Monitors system `uupd.service` and `uupd.timer` units through the systemd D-Bus API on the system bus
-- Smooth opacity-based pulsing animation
-- Metadata declares GNOME Shell 49 and 50 support
+`uupd-indicator` is a GNOME Shell extension that shows a pulsing download indicator when `uupd.service` is downloading or applying system updates. It is intended for Universal Blue, Bluefin, and compatible systems that expose `uupd.service` and `uupd.timer`.
 
 [screeencast](https://github.com/user-attachments/assets/bfa39984-85b9-4b1c-b3bd-faae13dd6f76)
 
@@ -16,104 +8,130 @@ A GNOME Shell extension that shows a pulsing download indicator when system upda
 ![detail](/screenshots/screenshot2.png)
 ![on click](/screenshots/screenshot3.png)
 
-## Installation
-
-### Manual Installation
-
-1. Clone this repository or download the source code
-2. Copy the extension directory to your GNOME Shell extensions folder:
-
-```bash
-cp -r uupd-indicator@projectbluefin.io ~/.local/share/gnome-shell/extensions/
-```
-
-3. Set proper file permissions:
-
-```bash
-chmod 644 ~/.local/share/gnome-shell/extensions/uupd-indicator@projectbluefin.io/*
-```
-
-4. Log out and log back in
-
-5. Enable the extension:
-
-```bash
-gnome-extensions enable uupd-indicator@projectbluefin.io
-```
-
-### From GNOME Extensions Website
-
-*Coming soon*
-
-## Usage
-
-The extension automatically monitors the system `uupd.service` and `uupd.timer` units.
-
-### Enable Automatic Updates
-
-To enable automatic updates on Universal Blue:
-
-```bash
-ujust toggle-updates
-```
-
-When automatic updates are enabled, the extension will show a pulsing download icon in the system tray whenever updates are being downloaded or applied.
-
-### Disable Automatic Updates
-
-Run the same command again to disable:
-
-```bash
-ujust toggle-updates
-```
-
-When automatic updates are disabled, the extension will hide the indicator.
-
 ## Requirements
 
 - GNOME Shell 49 or 50
-- Universal Blue or any system using `uupd.service` and `uupd.timer`
+- Universal Blue, Bluefin, or a compatible system with `uupd.service` and `uupd.timer`
 - systemd
+- `gnome-extensions` command
+- `just`
 
-## Development / verification
+## Quick install
 
-Development and verification notes, including GNOME 50 host checks, CI coverage, smoke-test limitations, and manual D-Bus/systemd debugging commands, live in [docs/gnome50-verification.md](docs/gnome50-verification.md).
-
-### File Structure
-
+```bash
+git clone https://github.com/Vyachean/uupd-indicator.git
+cd uupd-indicator
+just install
 ```
-uupd-indicator@projectbluefin.io/
-├── extension.js    # Main extension code
-├── metadata.json   # Extension metadata
-└── stylesheet.css  # Custom styles (if any)
+
+`just install` copies the extension into your user-local GNOME Shell extensions directory, enables it with `gnome-extensions`, and prints a reminder if GNOME Shell needs a logout/login cycle before the icon appears.
+
+## Update
+
+```bash
+cd uupd-indicator
+git pull
+just update
+```
+
+`just update` refreshes the installed files from your current checkout and re-enables the extension when possible.
+
+## Uninstall
+
+```bash
+just uninstall
+```
+
+This removes only the installed copy from your user extensions directory. It does not delete the source repository.
+
+## Usage
+
+The extension watches `uupd.service` and `uupd.timer`. When automatic updates are enabled and an update is running, GNOME Shell shows the pulsing indicator in the top bar.
+
+## Enable automatic updates
+
+```bash
+ujust toggle-updates
+```
+
+Run the same command again to disable automatic updates.
+
+## Status and logs
+
+Check whether the extension is installed and enabled, and whether the relevant systemd units exist:
+
+```bash
+just status
+```
+
+View recent GNOME Shell logs for troubleshooting:
+
+```bash
+just logs
+```
+
+List all available helper commands:
+
+```bash
+just
+```
+
+## Automatic updates
+
+Enable the host update timer with:
+
+```bash
+ujust toggle-updates
+```
+
+The extension does not update itself automatically. To update the installed extension files after new commits are pulled, run:
+
+```bash
+git pull
+just update
 ```
 
 ## Troubleshooting
 
-### Extension not showing up
+### The extension does not appear after install
 
-- Make sure file permissions are set correctly (644)
-- Log out and log back in to reload GNOME Shell
-- Check that the extension is enabled: `gnome-extensions list --enabled`
+- Run `just status` to confirm the extension is installed under your user extensions directory and visible to `gnome-extensions`.
+- If GNOME Shell does not pick up the new files immediately, log out and log back in.
+- If `gnome-extensions` is missing, install the GNOME Shell extension tools for your system and run `just install` again.
 
-### Icon not animating
+### The icon is not visible
 
-- Verify that automatic updates are enabled and that the system units are present on the host.
-- View extension logs: `journalctl /usr/bin/gnome-shell | grep uupd-indicator`
+- Make sure automatic updates are enabled with `ujust toggle-updates`.
+- Confirm that `uupd.timer` exists and is enabled by running `just status`.
+- If the extension was just installed or updated, log out and log back in before assuming GNOME Shell failed to load it.
 
-### Extension crashes or errors
+### Updates are not detected
 
-Check the GNOME Shell logs for errors:
+- Run `just status` and verify that `uupd.timer` exists and that `uupd.service` is visible to `systemctl`.
+- Check the next scheduled timer run with `systemctl list-timers --all uupd.timer`.
+- Use `just logs` to inspect recent GNOME Shell messages for extension errors.
+
+### How to check status
 
 ```bash
-journalctl /usr/bin/gnome-shell -f
+just status
 ```
 
-### Show triggering timestamps
+### How to view logs
+
 ```bash
-systemctl list-timers --all uupd.timer
+just logs
 ```
 
+### When logout/login is needed
+
+- After a first install, GNOME Shell may not detect the new extension immediately.
+- After an update, GNOME Shell may keep the old extension process until the next session restart.
+- If `just install` or `just update` says the extension was copied and enabled but the icon still does not appear, log out and log back in.
+
+## Development / verification
+
+Development and verification notes, including GNOME 50 host checks, CI coverage, smoke-test limitations, and manual D-Bus/systemd debugging commands, live in [docs/gnome50-verification.md](docs/gnome50-verification.md).
 
 ## License
 
@@ -126,4 +144,4 @@ GPLv3
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+Contributions are welcome. Issues and pull requests are welcome too.

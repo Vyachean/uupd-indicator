@@ -25,7 +25,11 @@ jobs:
       - name: Check shell scripts syntax
         run: |
           bash -n scripts/collect-host-diagnostics.sh
+          bash -n scripts/extension-logs.sh
+          bash -n scripts/extension-status.sh
+          bash -n scripts/install-extension.sh
           bash -n scripts/run-smoke-test.sh
+          bash -n scripts/uninstall-extension.sh
 
       - name: Reject debug leftovers
         run: |
