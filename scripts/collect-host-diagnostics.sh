@@ -8,6 +8,7 @@ EXT_SRC="$REPO_ROOT/$UUID"
 EXT_DST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 REPORT="${REPORT:-$REPO_ROOT/host-diagnostics-$(date +%Y%m%d-%H%M%S).md}"
 SINCE="${SINCE:-10 minutes ago}"
+INSTALL_SYMLINK="${INSTALL_SYMLINK:-0}"
 
 write() {
   printf '%s\n' "$*" >> "$REPORT"
@@ -43,6 +44,22 @@ run_shell() {
 
 : > "$REPORT"
 
+INSTALLED_RESOLVED="$(readlink -f "$EXT_DST" 2>/dev/null || true)"
+SOURCE_MATCH="no"
+if [ "$INSTALLED_RESOLVED" = "$EXT_SRC" ]; then
+  SOURCE_MATCH="yes"
+fi
+
+if [ "$INSTALL_SYMLINK" = "1" ] && [ "$SOURCE_MATCH" != "yes" ]; then
+  mkdir -p "$(dirname "$EXT_DST")"
+  rm -rf "$EXT_DST"
+  ln -s "$EXT_SRC" "$EXT_DST"
+  INSTALLED_RESOLVED="$(readlink -f "$EXT_DST" 2>/dev/null || true)"
+  if [ "$INSTALLED_RESOLVED" = "$EXT_SRC" ]; then
+    SOURCE_MATCH="yes"
+  fi
+fi
+
 write "# uupd-indicator host diagnostics"
 write ""
 write "- Date: $(date --iso-8601=seconds)"
@@ -50,6 +67,7 @@ write "- UUID: \`$UUID\`"
 write "- Repository: \`$REPO_ROOT\`"
 write "- Extension source: \`$EXT_SRC\`"
 write "- Installed extension path: \`$EXT_DST\`"
+write "- Installed resolved path: \`${INSTALLED_RESOLVED:-}\`"
 write "- Journal window: \`$SINCE\`"
 
 section "Environment"
@@ -72,6 +90,20 @@ run_shell "ls -la '$EXT_DST' 2>/dev/null || true"
 run_shell "readlink -f '$EXT_DST' 2>/dev/null || true"
 run_shell "gnome-extensions list 2>/dev/null | grep -F '$UUID' || true"
 run_shell "gnome-extensions info '$UUID' 2>&1 || true"
+
+section "Installed path verification"
+write "Expected source: $EXT_SRC"
+write "Installed path: $EXT_DST"
+write "Installed resolved path: ${INSTALLED_RESOLVED:-}"
+write "Matches repository source: $SOURCE_MATCH"
+if [ "$SOURCE_MATCH" != "yes" ]; then
+  write ""
+  write "WARNING: Installed extension path does not point to this repository checkout. Runtime smoke test may be testing another copy."
+fi
+if [ "$INSTALL_SYMLINK" = "1" ]; then
+  write ""
+  write "INSTALL_SYMLINK=1 was set, so the installed extension path was replaced with a symlink to this checkout before collecting the rest of the report."
+fi
 
 section "Enable/disable smoke test"
 write "This section toggles only the GNOME extension state. It does not start uupd.service."
@@ -100,7 +132,10 @@ run_shell "busctl --system get-property org.freedesktop.systemd1 /org/freedeskto
 run_shell "busctl --system get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/uupd_2eservice org.freedesktop.systemd1.Unit ActiveState 2>&1 || true"
 
 section "GNOME Shell journal"
-run_shell "journalctl --since '$SINCE' -o short-precise /usr/bin/gnome-shell 2>/dev/null | grep -Ei 'uupd|$UUID|JS ERROR|extension' || true"
+write "Extension-specific journal lines:"
+run_shell "journalctl --since '$SINCE' -o short-precise /usr/bin/gnome-shell 2>/dev/null | grep -F '$UUID' || true"
+write "JavaScript error lines:"
+run_shell "journalctl --since '$SINCE' -o short-precise /usr/bin/gnome-shell 2>/dev/null | grep -E 'JS ERROR|TypeError|ReferenceError|SyntaxError' || true"
 
 section "Summary hints"
 write "- If \`gnome-extensions info\` reports OUT_OF_DATE, metadata shell-version is still wrong."

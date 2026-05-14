@@ -25,11 +25,18 @@ const DBUS_NAME = "org.freedesktop.systemd1";
 const DBUS_PATH = "/org/freedesktop/systemd1/unit/uupd_2eservice";
 const DBUS_INTERFACE = "org.freedesktop.systemd1.Unit";
 const DBUS_TIMER_PATH = "/org/freedesktop/systemd1/unit/uupd_2etimer";
+const DBUS_CONNECTION = Gio.DBus.system;
 const DEBUG = false;
 
 function debug(message) {
   if (DEBUG)
     console.debug(`[uupd-indicator] ${message}`);
+}
+
+function unpackMaybeVariant(value) {
+  return value && typeof value.deep_unpack === "function"
+    ? value.deep_unpack()
+    : value;
 }
 
 const UupdIndicator = GObject.registerClass(
@@ -69,7 +76,7 @@ const UupdIndicator = GObject.registerClass(
 
     _initDBusProxy() {
       this._timerProxy = new Gio.DBusProxy({
-        g_connection: Gio.DBus.system,
+        g_connection: DBUS_CONNECTION,
         g_name: DBUS_NAME,
         g_object_path: DBUS_TIMER_PATH,
         g_interface_name: DBUS_INTERFACE,
@@ -103,7 +110,7 @@ const UupdIndicator = GObject.registerClass(
       );
 
       this._proxy = new Gio.DBusProxy({
-        g_connection: Gio.DBus.system,
+        g_connection: DBUS_CONNECTION,
         g_name: DBUS_NAME,
         g_object_path: DBUS_PATH,
         g_interface_name: DBUS_INTERFACE,
@@ -172,7 +179,7 @@ const UupdIndicator = GObject.registerClass(
         return false;
 
       const activeState = this._proxy.get_cached_property("ActiveState");
-      this._serviceState = activeState ? activeState.deep_unpack() : null;
+      this._serviceState = unpackMaybeVariant(activeState);
       if (this._serviceState)
         debug(`Service state: ${this._serviceState}`);
       return activeState !== null;
@@ -185,7 +192,7 @@ const UupdIndicator = GObject.registerClass(
       const changedProps = changed.deep_unpack();
 
       if ("ActiveState" in changedProps) {
-        this._serviceState = changedProps.ActiveState.deep_unpack();
+        this._serviceState = unpackMaybeVariant(changedProps.ActiveState);
         this._updateIndicatorState();
       }
     }

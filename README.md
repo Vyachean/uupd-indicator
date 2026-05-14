@@ -6,7 +6,7 @@ A GNOME Shell extension that shows a pulsing download indicator when system upda
 
 - Shows a pulsing download icon in the system tray when updates are running
 - Only active when automatic updates are enabled (`ujust toggle-updates`)
-- Monitors `uupd.service` state via D-Bus
+- Monitors system `uupd.service` and `uupd.timer` units through the systemd D-Bus API on the system bus
 - Smooth opacity-based pulsing animation
 - Metadata declares GNOME Shell 49 and 50 support
 
@@ -47,7 +47,7 @@ gnome-extensions enable uupd-indicator@projectbluefin.io
 
 ## Usage
 
-The extension automatically monitors the `uupd.service` and `uupd.timer` systemd units.
+The extension automatically monitors the system `uupd.service` and `uupd.timer` units.
 
 ### Enable Automatic Updates
 
@@ -77,7 +77,7 @@ When automatic updates are disabled, the extension will hide the indicator.
 
 ## Development
 
-The extension monitors the following systemd units via D-Bus:
+The extension monitors the following systemd units via the system bus:
 
 - `uupd.service` - The update service (shows indicator when active/activating)
 - `uupd.timer` - The timer that triggers automatic updates (extension only shows when enabled)
@@ -101,7 +101,7 @@ uupd-indicator@projectbluefin.io/
 
 ### Icon not animating
 
-- Verify that automatic updates are enabled and confirm whether `uupd` is exposed as a user unit or a system unit on the host before changing the extension bus model.
+- Verify that automatic updates are enabled and that the system units are present on the host.
 - View extension logs: `journalctl /usr/bin/gnome-shell | grep uupd-indicator`
 
 ### Extension crashes or errors
@@ -154,20 +154,22 @@ journalctl -f -o cat /usr/bin/gnome-shell | grep -Ei 'uupd|JS ERROR|extension'
 
 ### systemd / D-Bus checks
 
-The extension code currently still uses `Gio.DBus.system`. That matches the original implementation, but the correct bus model was not confirmed from the real host session in this task. Confirm the actual unit placement on the host before claiming the bus choice is correct.
+The GNOME 50 host diagnostics in `host-diagnostics-20260514-111104.md` show that `uupd.timer` and `uupd.service` are real system units on Bluefin, while the user-unit checks return `LoadState=not-found`. The extension therefore keeps using `Gio.DBus.system` to talk to `org.freedesktop.systemd1`.
 
-If `uupd` is exposed as user units on the host:
-
-```bash
-systemctl --user show uupd.timer -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
-systemctl --user show uupd.service -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
-```
-
-If `uupd` is exposed as system units on the host:
+Primary checks:
 
 ```bash
 systemctl show uupd.timer -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
 systemctl show uupd.service -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
+busctl --system get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/uupd_2etimer org.freedesktop.systemd1.Unit UnitFileState
+busctl --system get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/uupd_2eservice org.freedesktop.systemd1.Unit ActiveState
+```
+
+Comparison checks:
+
+```bash
+systemctl --user show uupd.timer -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
+systemctl --user show uupd.service -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
 ```
 
 ### Host diagnostic script
@@ -183,6 +185,8 @@ The report is written to:
 ```text
 host-diagnostics-YYYYMMDD-HHMMSS.md
 ```
+
+The report now also states whether the installed extension path resolves to this checkout, so a successful smoke test is not mistaken for another installed copy.
 
 ### Warning
 
