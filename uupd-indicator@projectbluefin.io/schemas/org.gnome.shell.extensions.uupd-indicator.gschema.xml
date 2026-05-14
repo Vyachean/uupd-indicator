@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.uupd-indicator" path="/org/gnome/shell/extensions/uupd-indicator/">
+    <key name="visibility-mode" type="s">
+      <default>'auto'</default>
+      <choices>
+        <choice value="auto"/>
+        <choice value="always"/>
+      </choices>
+      <summary>Indicator visibility mode</summary>
+      <description>
+        Controls whether the update indicator is shown only while updates run or fail, or remains visible in the top bar at all times.
+      </description>
+    </key>
+  </schema>
+</schemalist>

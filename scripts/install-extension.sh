@@ -39,6 +39,20 @@ copy_extension_files() {
   cp -a "$SOURCE_DIR/." "$TARGET_DIR/"
 }
 
+compile_schemas_if_present() {
+  local schema_dir="$TARGET_DIR/schemas"
+
+  [ -d "$schema_dir" ] || return 0
+
+  if ! command -v glib-compile-schemas >/dev/null 2>&1; then
+    fail "glib-compile-schemas is required to compile extension schemas in $schema_dir"
+  fi
+
+  if ! glib-compile-schemas "$schema_dir"; then
+    fail "failed to compile GSettings schemas in $schema_dir"
+  fi
+}
+
 has_gnome_extensions() {
   command -v gnome-extensions >/dev/null 2>&1
 }
@@ -72,6 +86,7 @@ case "$ACTION" in
   install)
     require_repo_root
     copy_extension_files
+    compile_schemas_if_present
     enable_extension "Installed"
     ;;
   update)
@@ -82,6 +97,7 @@ case "$ACTION" in
       fi
     fi
     copy_extension_files
+    compile_schemas_if_present
     enable_extension "Updated"
     ;;
   enable)

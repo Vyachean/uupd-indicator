@@ -3,6 +3,7 @@
   "description": "Shows a pulsing download indicator when system updates are being applied via uupd.service on BluefinOS/Universal Blue systems.",
   "uuid": "uupd-indicator@projectbluefin.io",
   "url": "https://github.com/Vyachean/uupd-indicator",
+  "settings-schema": "org.gnome.shell.extensions.uupd-indicator",
   "version": 1,
   "shell-version": [
     "49",

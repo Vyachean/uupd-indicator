@@ -35,6 +35,10 @@ journalctl -f -o cat /usr/bin/gnome-shell | grep -Ei 'uupd|JS ERROR|extension'
 
 Host diagnostics on Bluefin GNOME 50 confirmed that `uupd.timer` and `uupd.service` are system units, while user-unit checks returned `LoadState=not-found`.
 
+The extension intentionally reflects only systemd state that is available over D-Bus. Without changes in `uupd`, exact package-level progress or percentages are not available to the Shell extension. Failed automatic runs are surfaced as a warning icon, using `uupd.service` state plus best-effort `Result` and `ExecMainStatus` details when systemd exposes them.
+
+The default visibility mode is `auto`: inactive or missing service state stays hidden, active or activating with the timer enabled shows a pulsing download icon, and failed runs show a warning icon until dismissed or until service state changes. An optional `always` mode keeps the indicator visible in a neutral idle state even when `uupd.service` is inactive or unavailable.
+
 Primary checks:
 
 ```bash
@@ -72,7 +76,7 @@ The Fedora smoke path remains experimental and non-blocking. It is useful as a G
 | Path | What it validates | What it does not prove |
 | --- | --- | --- |
 | `static` (required) | `metadata.json` parses cleanly, shell helper scripts pass `bash -n`, known debug leftovers are rejected, `gnome-extensions pack` builds the packaged zip | No GNOME Shell runtime coverage |
-| `smoke-fedora-container-probe` (experimental, non-blocking) | Fedora 44 provides GNOME Shell 50 tooling, `gnome-shell-test-tool` exposes `--extension`, the packaged extension startup is attempted with fake provider state from `tests/smoke-extension.js` | No full GNOME host-session integration, no real systemd/logind/session-bus coverage, no real `uupd.service` behavior |
+| `smoke-fedora-container-probe` (experimental, non-blocking) | Fedora 44 provides GNOME Shell 50 tooling, `gnome-shell-test-tool` exposes `--extension`, the packaged extension startup is attempted with fake provider state and fake settings mode changes from `tests/smoke-extension.js` | No full GNOME host-session integration, no real systemd/logind/session-bus coverage, no real `uupd.service` behavior |
 | Self-hosted Bluefin / GNOME 50 runner or manual host session | Real logged-in GNOME 50 host behavior, real D-Bus/session/system integration, real extension behavior on the target desktop | Not covered by GitHub-hosted container CI |
 
 Hosted GitHub Fedora containers do not provide a full systemd/logind/system-bus desktop environment. GNOME Shell 50 tooling is available there, but Shell UI startup can still fail before the extension meaningfully runs because the container lacks the host services that a real GNOME session expects.
@@ -96,8 +100,11 @@ Real host integration remains the responsibility of `./scripts/collect-host-diag
 
 ```bash
 python3 -m json.tool uupd-indicator@projectbluefin.io/metadata.json
+bash -n scripts/install-extension.sh
 bash -n scripts/collect-host-diagnostics.sh
 bash -n scripts/run-smoke-test.sh
+glib-compile-schemas uupd-indicator@projectbluefin.io/schemas
+gnome-extensions pack uupd-indicator@projectbluefin.io --force
 grep -R "console.log\|_iconToggle\|GETTEXT_DOMAIN\|DBUS_MANAGER_INTERFACE" -n uupd-indicator@projectbluefin.io || true
 ```
 
@@ -123,6 +130,8 @@ The smoke test:
 - drives the indicator through fake provider state only
 
 The smoke test does not start `uupd.service` and does not trigger real system updates. It verifies extension loading, indicator registration, visibility changes for fake `active` / `activating` / `inactive` states, and actor cleanup on disable.
+
+It also verifies the fake failed-state warning path, session-only dismiss behavior in `auto` mode, and the idle fallback path in `always` mode.
 
 Real visual behavior during an actual host update still needs natural observation during a real update window or a separate manual runtime check.
 
