@@ -188,7 +188,7 @@ The report also states whether the installed extension path resolves to this che
 
 ## CI
 
-GitHub Actions runs the required static checks on every `push` and `pull_request`.
+GitHub Actions runs the required static checks for pull requests, pushes to `main`, and manual `workflow_dispatch` runs.
 
 The Fedora smoke path remains experimental and non-blocking on purpose. It is useful as a GNOME 50 tooling probe, but it is not a substitute for a real GNOME host session.
 
