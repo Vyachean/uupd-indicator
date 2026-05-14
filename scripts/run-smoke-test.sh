@@ -21,6 +21,25 @@ cleanup() {
   fi
 }
 
+print_runtime_diagnostics() {
+  printf 'gnome-shell version: '
+  gnome-shell --version
+
+  if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    printf 'DBUS_SESSION_BUS_ADDRESS: set\n'
+  else
+    printf 'DBUS_SESSION_BUS_ADDRESS: unset\n'
+  fi
+
+  printf 'XDG_RUNTIME_DIR: %s\n' "$XDG_RUNTIME_DIR"
+  if command -v stat >/dev/null 2>&1; then
+    printf 'XDG_RUNTIME_DIR permissions: '
+    stat -c '%a %U:%G' "$XDG_RUNTIME_DIR"
+  else
+    printf 'XDG_RUNTIME_DIR permissions: unavailable (stat not found)\n'
+  fi
+}
+
 command -v gnome-extensions >/dev/null 2>&1 || fail "gnome-extensions is required"
 command -v gnome-shell-test-tool >/dev/null 2>&1 || fail "gnome-shell-test-tool is not installed"
 
@@ -49,6 +68,8 @@ if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
   export XDG_RUNTIME_DIR="$runtime_dir"
   trap cleanup EXIT
 fi
+
+print_runtime_diagnostics
 
 command=(
   gnome-shell-test-tool

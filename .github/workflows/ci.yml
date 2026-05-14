@@ -37,8 +37,8 @@ jobs:
       - name: Pack extension zip
         run: gnome-extensions pack uupd-indicator@projectbluefin.io --force
 
-  smoke-fedora:
-    name: smoke-fedora (experimental, non-blocking)
+  smoke-fedora-container-probe:
+    name: smoke-fedora-container-probe (experimental, non-blocking)
     runs-on: ubuntu-latest
     continue-on-error: true
     container:
@@ -108,8 +108,9 @@ jobs:
   #     - name: Run packaged-extension smoke test
   #       run: ./scripts/run-smoke-test.sh
 
-  # Self-hosted template for real host integration checks. Do not enable as a
-  # required check until the runner exists and is stable.
+  # Self-hosted template for real host integration checks. This is the correct
+  # path for real GNOME host-session coverage once the runner exists and is
+  # stable. Do not enable as a required check until then.
   #
   # smoke-bluefin-host:
   #   if: github.event_name == 'workflow_dispatch'

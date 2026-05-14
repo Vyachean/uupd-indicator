@@ -190,30 +190,30 @@ The report also states whether the installed extension path resolves to this che
 
 GitHub Actions runs the required static checks on every `push` and `pull_request`.
 
-The Fedora smoke path is separate and experimental for now. It runs through `workflow_dispatch` first so the repository does not silently lose smoke coverage while the hosted-container behavior is still being validated.
+The Fedora smoke path remains experimental and non-blocking on purpose. It is useful as a GNOME 50 tooling probe, but it is not a substitute for a real GNOME host session.
 
-Static CI verifies:
+### Testing matrix
 
-- `metadata.json` parses cleanly
-- shell helper scripts pass `bash -n`
-- the extension tree does not contain known debug or stale legacy symbols
-- `gnome-extensions pack` can build a packaged zip
+| Path | What it validates | What it does not prove |
+| --- | --- | --- |
+| `static` (required) | `metadata.json` parses cleanly, shell helper scripts pass `bash -n`, known debug leftovers are rejected, `gnome-extensions pack` builds the packaged zip | No GNOME Shell runtime coverage |
+| `smoke-fedora-container-probe` (experimental, non-blocking) | Fedora 44 provides GNOME Shell 50 tooling, `gnome-shell-test-tool` exposes `--extension`, the packaged extension startup is attempted with fake provider state from `tests/smoke-extension.js` | No full GNOME host-session integration, no real systemd/logind/session-bus coverage, no real `uupd.service` behavior |
+| Self-hosted Bluefin / GNOME 50 runner or manual host session | Real logged-in GNOME 50 host behavior, real D-Bus/session/system integration, real extension behavior on the target desktop | Not covered by GitHub-hosted container CI |
 
-Fedora smoke CI is intentionally narrower:
+Hosted GitHub Fedora containers do not provide a full systemd/logind/system-bus desktop environment. GNOME Shell 50 tooling is available there, but Shell UI startup can still fail before the extension meaningfully runs because the container lacks the host services that a real GNOME session expects.
 
-- it runs through `gnome-shell-test-tool` against the packaged extension zip
-- it targets a Fedora GNOME userspace in a GitHub Actions job container instead of the default Ubuntu host image
+For that reason, `smoke-fedora-container-probe` is diagnostic only:
+
+- it runs `gnome-shell-test-tool` against the packaged extension zip
+- it targets a Fedora GNOME userspace inside a GitHub Actions job container
 - it drives only fake provider state from `tests/smoke-extension.js`
 - it does not start `uupd.service`
 - it does not touch real systemd unit state
-- it does not prove real Bluefin `uupd` integration
+- it may fail because the hosted container does not provide full GNOME host-session services
 
-The Fedora smoke job prints `gnome-shell --version`, prints `gnome-shell-test-tool --help`, and fails explicitly when the tool does not expose `--extension`. If that path proves reliable in GitHub Actions, it can be promoted to a required `pull_request` check. Until then it remains non-required on purpose.
+The Fedora probe prints `gnome-shell --version`, prints `gnome-shell-test-tool --help`, prints whether `DBUS_SESSION_BUS_ADDRESS` is set, and prints the `XDG_RUNTIME_DIR` path and permissions before attempting startup. When no session bus is already available, the smoke runner starts `gnome-shell-test-tool` inside `dbus-run-session`.
 
-Hosted GitHub runners do not provide a real Bluefin desktop session, a real GNOME login lifecycle, or real `uupd` integration. CI never starts `uupd.service`.
-When no session bus is already available, the smoke runner starts `gnome-shell-test-tool` inside `dbus-run-session`.
-
-Real host integration remains the responsibility of `./scripts/collect-host-diagnostics.sh`. Real visual behavior during an actual update window still requires natural observation on a real host or a separate self-hosted Bluefin / GNOME 50 runner.
+Real host integration remains the responsibility of `./scripts/collect-host-diagnostics.sh` and a real GNOME 50 host session. The commented self-hosted Bluefin / GNOME 50 runner template in CI is the correct path for real host integration checks once such a runner exists.
 
 ## Verification
 
