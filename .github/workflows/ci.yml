@@ -51,6 +51,7 @@ jobs:
       - name: Install GNOME Shell test tooling
         run: |
           dnf install -y \
+            dbus-daemon \
             findutils \
             gnome-shell \
             grep \

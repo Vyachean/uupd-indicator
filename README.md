@@ -211,6 +211,7 @@ Fedora smoke CI is intentionally narrower:
 The Fedora smoke job prints `gnome-shell --version`, prints `gnome-shell-test-tool --help`, and fails explicitly when the tool does not expose `--extension`. If that path proves reliable in GitHub Actions, it can be promoted to a required `pull_request` check. Until then it remains non-required on purpose.
 
 Hosted GitHub runners do not provide a real Bluefin desktop session, a real GNOME login lifecycle, or real `uupd` integration. CI never starts `uupd.service`.
+When no session bus is already available, the smoke runner starts `gnome-shell-test-tool` inside `dbus-run-session`.
 
 Real host integration remains the responsibility of `./scripts/collect-host-diagnostics.sh`. Real visual behavior during an actual update window still requires natural observation on a real host or a separate self-hosted Bluefin / GNOME 50 runner.
 

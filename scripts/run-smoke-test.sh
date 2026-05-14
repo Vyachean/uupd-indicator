@@ -35,7 +35,16 @@ gnome-extensions pack \
 
 [ -f "$ZIP_PATH" ] || fail "expected extension zip was not created: $ZIP_PATH"
 
-exec gnome-shell-test-tool \
-  --headless \
-  --extension "$ZIP_PATH" \
+command=(
+  gnome-shell-test-tool
+  --headless
+  --extension "$ZIP_PATH"
   "$TEST_SCRIPT"
+)
+
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+  command -v dbus-run-session >/dev/null 2>&1 || fail "dbus-run-session is required when no DBUS_SESSION_BUS_ADDRESS is set"
+  exec dbus-run-session -- "${command[@]}"
+fi
+
+exec "${command[@]}"
