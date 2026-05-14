@@ -8,7 +8,7 @@ A GNOME Shell extension that shows a pulsing download indicator when system upda
 - Only active when automatic updates are enabled (`ujust toggle-updates`)
 - Monitors `uupd.service` state via D-Bus
 - Smooth opacity-based pulsing animation
-- Works with GNOME Shell 49
+- Metadata declares GNOME Shell 49 and 50 support
 
 [screeencast](https://github.com/user-attachments/assets/bfa39984-85b9-4b1c-b3bd-faae13dd6f76)
 
@@ -33,7 +33,7 @@ cp -r uupd-indicator@projectbluefin.io ~/.local/share/gnome-shell/extensions/
 chmod 644 ~/.local/share/gnome-shell/extensions/uupd-indicator@projectbluefin.io/*
 ```
 
-4. Log out and log back in (or restart GNOME Shell with `Alt+F2`, then type `r` and press Enter on X11)
+4. Log out and log back in
 
 5. Enable the extension:
 
@@ -71,7 +71,7 @@ When automatic updates are disabled, the extension will hide the indicator.
 
 ## Requirements
 
-- GNOME Shell 49
+- GNOME Shell 49 or 50
 - Universal Blue or any system using `uupd.service` and `uupd.timer`
 - systemd
 
@@ -101,8 +101,7 @@ uupd-indicator@projectbluefin.io/
 
 ### Icon not animating
 
-- Verify that automatic updates are enabled: `systemctl --user is-enabled uupd.timer`
-- Check that updates are actually running: `systemctl --user status uupd.service`
+- Verify that automatic updates are enabled and confirm whether `uupd` is exposed as a user unit or a system unit on the host before changing the extension bus model.
 - View extension logs: `journalctl /usr/bin/gnome-shell | grep uupd-indicator`
 
 ### Extension crashes or errors
@@ -117,6 +116,81 @@ journalctl /usr/bin/gnome-shell -f
 ```bash
 systemctl list-timers --all uupd.timer
 ```
+
+## GNOME 50 debug / verification
+
+Runtime verification for GNOME Shell 50 must be done in the real host GNOME session. Editing, static checks, JSON validation, shell syntax checks, and package build checks are fine in `distrobox`, but they do not prove that the extension works in GNOME Shell.
+
+The repository currently keeps `version` at `1`. This cleanup is aimed at development normalization, not at preparing a new packaged release zip.
+
+### Local symlink install
+
+```bash
+UUID="uupd-indicator@projectbluefin.io"
+EXT_DIR="$HOME/.local/share/gnome-shell/extensions/$UUID"
+
+rm -rf "$EXT_DIR"
+ln -s "$PWD/$UUID" "$EXT_DIR"
+```
+
+### Extension status
+
+```bash
+gnome-extensions info uupd-indicator@projectbluefin.io
+gnome-extensions enable uupd-indicator@projectbluefin.io
+```
+
+### GNOME Shell logs
+
+```bash
+journalctl -f -o cat /usr/bin/gnome-shell
+```
+
+Filtered version:
+
+```bash
+journalctl -f -o cat /usr/bin/gnome-shell | grep -Ei 'uupd|JS ERROR|extension'
+```
+
+### systemd / D-Bus checks
+
+The extension code currently still uses `Gio.DBus.system`. That matches the original implementation, but the correct bus model was not confirmed from the real host session in this task. Confirm the actual unit placement on the host before claiming the bus choice is correct.
+
+If `uupd` is exposed as user units on the host:
+
+```bash
+systemctl --user show uupd.timer -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
+systemctl --user show uupd.service -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
+```
+
+If `uupd` is exposed as system units on the host:
+
+```bash
+systemctl show uupd.timer -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
+systemctl show uupd.service -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
+```
+
+### Host diagnostic script
+
+Run:
+
+```bash
+./scripts/collect-host-diagnostics.sh
+```
+
+The report is written to:
+
+```text
+host-diagnostics-YYYYMMDD-HHMMSS.md
+```
+
+### Warning
+
+Do not start `uupd.service` manually as a test unless you understand what it will do on the current system. It may start a real update.
+
+### GNOME 50 / Wayland
+
+On GNOME 50 / Wayland, do not rely on `Alt+F2`, then `r`. A full reload usually requires logout/login or a separate nested shell or devkit session.
 
 ## License
 
