@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install GNOME extension tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-shell
+
+      - name: Validate metadata JSON
+        run: python3 -m json.tool uupd-indicator@projectbluefin.io/metadata.json
+
+      - name: Check shell scripts syntax
+        run: |
+          bash -n scripts/collect-host-diagnostics.sh
+          bash -n scripts/run-smoke-test.sh
+
+      - name: Reject debug leftovers
+        run: |
+          if grep -R "console.log\|_iconToggle\|GETTEXT_DOMAIN\|DBUS_MANAGER_INTERFACE" -n uupd-indicator@projectbluefin.io; then
+            echo "Unexpected debug or legacy symbol found"
+            exit 1
+          fi
+
+      - name: Pack extension zip
+        run: gnome-extensions pack uupd-indicator@projectbluefin.io --force
+
+  smoke:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install GNOME Shell test tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-shell
+
+      - name: Probe gnome-shell-test-tool support
+        run: |
+          gnome-shell-test-tool --version
+          if ! gnome-shell-test-tool --help 2>&1 | grep -F -- "--extension" >/dev/null; then
+            echo "Hosted runner smoke test cannot run: gnome-shell-test-tool is present, but this build does not support --extension."
+            echo "A GNOME Shell 50 or newer test environment is required for packaged-extension smoke testing."
+            exit 1
+          fi
+
+      - name: Run packaged-extension smoke test
+        run: ./scripts/run-smoke-test.sh

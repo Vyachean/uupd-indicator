@@ -186,6 +186,29 @@ The report is written to a timestamped Markdown file in the repository root.
 
 The report also states whether the installed extension path resolves to this checkout, so a successful smoke test is not mistaken for another installed copy.
 
+## CI
+
+GitHub Actions runs the required static checks on every `push` and `pull_request`, and exposes a manual smoke workflow path through `workflow_dispatch`.
+
+Static CI verifies:
+
+- `metadata.json` parses cleanly
+- shell helper scripts pass `bash -n`
+- the extension tree does not contain known debug or stale legacy symbols
+- `gnome-extensions pack` can build a packaged zip
+
+Smoke CI is intentionally narrower:
+
+- it runs through `gnome-shell-test-tool` against the packaged extension zip
+- it drives only fake provider state from `tests/smoke-extension.js`
+- it does not start `uupd.service`
+- it does not touch real systemd unit state
+- it does not prove real Bluefin `uupd` integration
+
+Hosted GitHub runners are not currently assumed to provide GNOME Shell 50 `gnome-shell-test-tool --extension` support reliably. Because of that, the smoke job is manual for now and fails explicitly when the runner only has older tooling. Once a GNOME 50-capable hosted or self-hosted runner is confirmed, that smoke job can be promoted to a required check.
+
+Real host integration remains the responsibility of `./scripts/collect-host-diagnostics.sh`. Real visual behavior during an actual update window still requires natural observation on a real host or a separate manual host check.
+
 ## Verification
 
 ### Static checks
