@@ -64,8 +64,8 @@ When `uupd.service` is inactive, the indicator stays hidden in `Auto` mode. In `
 
 Open the GNOME Extensions app or run `gnome-extensions prefs uupd-indicator@projectbluefin.io`, then choose one of:
 
-- `Auto: show only while updates run or when an update fails`
-- `Always: keep the indicator visible in the top bar`
+- `Auto`: show only while updates run or when an update fails
+- `Always`: keep the indicator visible in the top bar
 
 ## Status and logs
 
