@@ -8,10 +8,17 @@ EXT_DIR="$REPO_ROOT/$UUID"
 TEST_SCRIPT="$REPO_ROOT/tests/smoke-extension.js"
 BUILD_DIR="${BUILD_DIR:-$REPO_ROOT/.tmp/smoke-test}"
 ZIP_PATH="$BUILD_DIR/$UUID.shell-extension.zip"
+runtime_dir=""
 
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
+}
+
+cleanup() {
+  if [ -n "$runtime_dir" ] && [ -d "$runtime_dir" ]; then
+    rm -rf "$runtime_dir"
+  fi
 }
 
 command -v gnome-extensions >/dev/null 2>&1 || fail "gnome-extensions is required"
@@ -35,6 +42,14 @@ gnome-extensions pack \
 
 [ -f "$ZIP_PATH" ] || fail "expected extension zip was not created: $ZIP_PATH"
 
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+  runtime_parent="${RUNNER_TEMP:-/tmp}"
+  runtime_dir="$(mktemp -d "$runtime_parent/uupd-indicator-runtime.XXXXXX")"
+  chmod 700 "$runtime_dir"
+  export XDG_RUNTIME_DIR="$runtime_dir"
+  trap cleanup EXIT
+fi
+
 command=(
   gnome-shell-test-tool
   --headless
@@ -44,7 +59,7 @@ command=(
 
 if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
   command -v dbus-run-session >/dev/null 2>&1 || fail "dbus-run-session is required when no DBUS_SESSION_BUS_ADDRESS is set"
-  exec dbus-run-session -- "${command[@]}"
+  dbus-run-session -- "${command[@]}"
+else
+  "${command[@]}"
 fi
-
-exec "${command[@]}"
