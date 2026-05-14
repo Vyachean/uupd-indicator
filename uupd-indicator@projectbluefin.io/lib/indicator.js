@@ -102,7 +102,8 @@ export const UupdIndicator = GObject.registerClass(
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
       this._rows = {
-        currentState: createValueRow(),
+        state: createValueRow(),
+        status: createValueRow(),
         elapsed: createValueRow(),
         automaticUpdates: createValueRow(),
         nextCheck: createValueRow(),
@@ -226,38 +227,20 @@ export const UupdIndicator = GObject.registerClass(
       row.item.visible = visible;
     }
 
-    _updatePopup(state, derivedState) {
-      const {
-        currentState,
-        elapsed,
-        automaticUpdates,
-        nextCheck,
-        lastTrigger,
-        serviceResult,
-        exitStatus,
-        lastRun,
-      } = this._rows;
+    _hideAllPopupRows() {
+      for (const row of Object.values(this._rows))
+        row.item.visible = false;
 
-      if (derivedState.mode === "failed") {
-        this._titleItem.label.text = _("Automatic update failed");
-      } else if (derivedState.mode === "updating") {
-        this._titleItem.label.text = _("System update in progress");
-      } else {
-        this._titleItem.label.text = _("Universal Blue Update Indicator");
-      }
+      this._hintRow.item.visible = false;
+      this._hintRow.label.text = "";
+      this._dismissItem.visible = false;
+    }
 
-      this._setRowVisible(
-        currentState,
-        _("Current state"),
-        formatServiceStateLabel(state.serviceActiveState, state.serviceSubState)
-      );
-      this._setRowVisible(
-        elapsed,
-        _("Elapsed"),
-        derivedState.mode === "updating"
-          ? formatElapsedDuration(state.serviceActiveEnterTimestamp)
-          : null
-      );
+    _updateIdlePopup(state, derivedState) {
+      const { status, automaticUpdates, nextCheck } = this._rows;
+
+      this._titleItem.label.text = _("Universal Blue Update Indicator");
+      this._setRowVisible(status, _("Status"), _("Idle"));
       this._setRowVisible(
         automaticUpdates,
         _("Automatic updates"),
@@ -265,46 +248,72 @@ export const UupdIndicator = GObject.registerClass(
       );
       this._setRowVisible(
         nextCheck,
-        _("Next scheduled check"),
+        _("Next check"),
         formatTimestamp(state.timerNextElapseUSecRealtime)
       );
+    }
+
+    _updateUpdatingPopup(state, derivedState) {
+      const { state: serviceState, elapsed, automaticUpdates } = this._rows;
+
+      this._titleItem.label.text = _("System update in progress");
       this._setRowVisible(
-        lastTrigger,
-        _("Last timer trigger"),
-        formatTimestamp(state.timerLastTriggerUSec)
+        serviceState,
+        _("State"),
+        formatServiceStateLabel(state.serviceActiveState, state.serviceSubState)
       );
       this._setRowVisible(
-        serviceResult,
-        _("Service result"),
-        derivedState.mode === "failed" ? state.serviceResult : null
+        elapsed,
+        _("Elapsed"),
+        formatElapsedDuration(state.serviceActiveEnterTimestamp)
       );
+      this._setRowVisible(
+        automaticUpdates,
+        _("Automatic updates"),
+        derivedState.timerEnabled ? _("Enabled") : _("Disabled")
+      );
+    }
+
+    _updateFailedPopup(state) {
+      const { state: serviceState, serviceResult, exitStatus, lastRun } = this._rows;
+
+      this._titleItem.label.text = _("Automatic update failed");
+      this._setRowVisible(
+        serviceState,
+        _("State"),
+        formatServiceStateLabel(state.serviceActiveState, state.serviceSubState)
+      );
+      this._setRowVisible(serviceResult, _("Service result"), state.serviceResult);
       this._setRowVisible(
         exitStatus,
         _("Exit status"),
-        derivedState.mode === "failed" && state.serviceExecMainStatus !== null
-          ? state.serviceExecMainStatus
-          : null
+        state.serviceExecMainStatus !== null ? state.serviceExecMainStatus : null
       );
       this._setRowVisible(
         lastRun,
         _("Last run"),
-        derivedState.mode === "failed"
-          ? formatTimestamp(state.serviceInactiveEnterTimestamp)
-          : null
+        formatTimestamp(state.serviceInactiveEnterTimestamp)
       );
 
-      const failedHint = _("Run `just logs` in the repository or check `journalctl -u uupd.service` for details.");
-      const idleHint = _("No exact update percentage is available because uupd does not expose progress over D-Bus.");
-      const showHint = derivedState.mode === "failed" || derivedState.mode === "idle";
+      this._hintRow.item.visible = true;
+      this._hintRow.label.text = _("Run `just logs` in the repository or check `journalctl -u uupd.service` for details.");
+      this._dismissItem.visible = true;
+    }
 
-      this._hintRow.item.visible = showHint;
-      this._hintRow.label.text = derivedState.mode === "failed"
-        ? failedHint
-        : derivedState.mode === "idle"
-          ? idleHint
-          : "";
+    _updatePopup(state, derivedState) {
+      this._hideAllPopupRows();
 
-      this._dismissItem.visible = derivedState.mode === "failed";
+      if (derivedState.mode === "failed") {
+        this._updateFailedPopup(state);
+        return;
+      }
+
+      if (derivedState.mode === "updating") {
+        this._updateUpdatingPopup(state, derivedState);
+        return;
+      }
+
+      this._updateIdlePopup(state, derivedState);
     }
 
     _updateSessionSignals(state) {

@@ -62,9 +62,11 @@ function getServiceStateIconName(mode) {
   case "failed":
     return "dialog-warning-symbolic";
   case "updating":
-  case "idle":
-  default:
     return "folder-download-symbolic";
+  case "idle":
+    return "view-refresh-symbolic";
+  default:
+    return "view-refresh-symbolic";
   }
 }
 

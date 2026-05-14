@@ -48,7 +48,7 @@ This removes only the installed copy from your user extensions directory. It doe
 
 The extension watches `uupd.service` and `uupd.timer` over D-Bus. The default visibility mode is `Auto`, which keeps the current top-bar behavior: hidden while inactive, pulsing while updates run, and a warning icon when the last automatic run fails.
 
-An optional `Always` visibility mode is available in the extension preferences. In that mode the indicator remains visible in the top bar even while `uupd.service` is inactive, using a neutral `folder-download-symbolic` idle icon without fake progress percentages.
+An optional `Always` visibility mode is available in the extension preferences. In that mode the indicator remains visible in the top bar even while `uupd.service` is inactive, using a neutral `view-refresh-symbolic` idle icon without fake progress percentages.
 
 ## UX and status model
 
@@ -58,7 +58,7 @@ Because `uupd` does not currently expose exact update progress to the extension,
 
 If the last automatic `uupd.service` run fails, the top bar shows a warning icon instead of silently hiding the problem. The popup includes the systemd result and exit status when systemd exposes them, and the warning can be dismissed for the current failed state.
 
-When `uupd.service` is inactive, the indicator stays hidden in `Auto` mode. In `Always` mode it stays visible as a neutral idle indicator and shows the current service state, automatic updates status, next scheduled check, and last timer trigger when systemd exposes them.
+When `uupd.service` is inactive, the indicator stays hidden in `Auto` mode. In `Always` mode it stays visible as a neutral idle indicator and shows only a compact user-facing summary with status, automatic updates state, and the next scheduled check when systemd exposes it.
 
 ## Preferences
 

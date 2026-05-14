@@ -22,6 +22,9 @@ jobs:
       - name: Validate metadata JSON
         run: python3 -m json.tool uupd-indicator@projectbluefin.io/metadata.json
 
+      - name: Compile GSettings schemas
+        run: glib-compile-schemas uupd-indicator@projectbluefin.io/schemas
+
       - name: Check shell scripts syntax
         run: |
           bash -n scripts/collect-host-diagnostics.sh

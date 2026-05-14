@@ -168,7 +168,7 @@ export function* run() {
   yield Scripting.waitLeisure();
   assertIndicatorVisibility(true, "Indicator should stay visible in always mode when service is inactive");
   assertPulsing(false, "Indicator should not pulse in always-mode idle state");
-  assertIconName("folder-download-symbolic", "Indicator should use the idle download icon in always mode");
+  assertIconName("view-refresh-symbolic", "Indicator should use the neutral idle icon in always mode");
 
   indicator.setStateForTesting({
     timerEnabled: false,
@@ -217,7 +217,7 @@ export function* run() {
   yield Scripting.waitLeisure();
   assertIndicatorVisibility(true, "Dismiss in always mode should keep the indicator visible");
   assertPulsing(false, "Dismiss in always mode should return to non-pulsing idle state");
-  assertIconName("folder-download-symbolic", "Dismiss in always mode should clear the warning icon back to idle");
+  assertIconName("view-refresh-symbolic", "Dismiss in always mode should clear the warning icon back to idle");
 
   indicator.setStateForTesting({
     timerEnabled: true,
@@ -228,7 +228,7 @@ export function* run() {
   yield Scripting.waitLeisure();
   assertIndicatorVisibility(true, "Indicator should stay visible in always mode when service state is missing");
   assertPulsing(false, "Indicator should stay idle in always mode when service state is missing");
-  assertIconName("folder-download-symbolic", "Missing service state should use the idle icon in always mode");
+  assertIconName("view-refresh-symbolic", "Missing service state should use the idle icon in always mode");
 
   yield Scripting.sleep(50);
   disableExtension();
