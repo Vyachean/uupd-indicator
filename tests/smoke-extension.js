@@ -4,6 +4,8 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as Scripting from "resource:///org/gnome/shell/ui/scripting.js";
 
 const UUID = "uupd-indicator@projectbluefin.io";
+const VISIBILITY_AUTO = "auto";
+const VISIBILITY_ALWAYS = "always";
 
 function assert(condition, message) {
   if (!condition)
@@ -59,7 +61,9 @@ export function* run() {
   const indicator = getIndicator();
   assert(indicator, "Indicator was not added to Main.panel.statusArea");
   assert(typeof indicator.setStateForTesting === "function", "Indicator does not expose the expected smoke-test seam");
+  assert(typeof indicator.setVisibilityModeForTesting === "function", "Indicator does not expose the expected settings seam");
 
+  indicator.setVisibilityModeForTesting(VISIBILITY_AUTO);
   indicator.setStateForTesting({
     timerEnabled: false,
     serviceState: "active",
@@ -78,6 +82,15 @@ export function* run() {
   assertIndicatorVisibility(true, "Indicator should be visible when timer is enabled and service is active");
   assertPulsing(true, "Indicator should pulse when service is active");
   assertIconName("folder-download-symbolic", "Indicator should use the download icon while updating");
+
+  indicator.setStateForTesting({
+    timerEnabled: false,
+    serviceState: "active",
+    serviceActiveState: "active",
+    timerUnitFileState: "static",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(false, "Indicator should not treat a static timer unit as updating without an explicit enabled fallback");
 
   indicator.setStateForTesting({
     timerEnabled: true,
@@ -144,6 +157,78 @@ export function* run() {
   });
   yield Scripting.waitLeisure();
   assertIndicatorVisibility(false, "Indicator should be hidden when timer is enabled and service state is missing");
+
+  indicator.setVisibilityModeForTesting(VISIBILITY_ALWAYS);
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    serviceState: "inactive",
+    serviceActiveState: "inactive",
+    timerUnitFileState: "enabled",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Indicator should stay visible in always mode when service is inactive");
+  assertPulsing(false, "Indicator should not pulse in always-mode idle state");
+  assertIconName("folder-download-symbolic", "Indicator should use the idle download icon in always mode");
+
+  indicator.setStateForTesting({
+    timerEnabled: false,
+    serviceState: "inactive",
+    serviceActiveState: "inactive",
+    timerUnitFileState: "disabled",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Indicator should stay visible in always mode when automatic updates are disabled");
+  assertPulsing(false, "Indicator should not pulse when automatic updates are disabled");
+
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    serviceState: "active",
+    serviceActiveState: "active",
+    timerUnitFileState: "enabled",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Indicator should remain visible while updating in always mode");
+  assertPulsing(true, "Indicator should pulse while updating in always mode");
+
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    serviceState: "activating",
+    serviceActiveState: "activating",
+    timerUnitFileState: "enabled",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Indicator should remain visible while activating in always mode");
+  assertPulsing(true, "Indicator should pulse while activating in always mode");
+
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    serviceState: "failed",
+    serviceActiveState: "failed",
+    serviceResult: "exit-code",
+    serviceExecMainStatus: 3,
+    timerUnitFileState: "enabled",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Indicator should show failed state in always mode");
+  assertPulsing(false, "Indicator should not pulse when failed in always mode");
+  assertIconName("dialog-warning-symbolic", "Indicator should use the warning icon in always mode");
+
+  indicator._dismissItem.activate(0);
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Dismiss in always mode should keep the indicator visible");
+  assertPulsing(false, "Dismiss in always mode should return to non-pulsing idle state");
+  assertIconName("folder-download-symbolic", "Dismiss in always mode should clear the warning icon back to idle");
+
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    serviceState: null,
+    serviceActiveState: null,
+    timerUnitFileState: null,
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Indicator should stay visible in always mode when service state is missing");
+  assertPulsing(false, "Indicator should stay idle in always mode when service state is missing");
+  assertIconName("folder-download-symbolic", "Missing service state should use the idle icon in always mode");
 
   yield Scripting.sleep(50);
   disableExtension();

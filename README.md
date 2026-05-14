@@ -1,6 +1,6 @@
 # Universal Blue Update Indicator
 
-`uupd-indicator` is a GNOME Shell extension that shows a pulsing download indicator when `uupd.service` is downloading or applying system updates. It is intended for Universal Blue, Bluefin, and compatible systems that expose `uupd.service` and `uupd.timer`.
+`uupd-indicator` is a GNOME Shell extension for Universal Blue, Bluefin, and compatible systems that expose `uupd.service` and `uupd.timer`. By default it shows a pulsing download indicator only while automatic updates are running, and a warning icon when the last automatic run fails.
 
 [screencast](https://github.com/user-attachments/assets/bfa39984-85b9-4b1c-b3bd-faae13dd6f76)
 
@@ -24,7 +24,7 @@ cd uupd-indicator
 just install
 ```
 
-`just install` copies the extension into your user-local GNOME Shell extensions directory, enables it with `gnome-extensions`, and prints a reminder if GNOME Shell needs a logout/login cycle before the icon appears.
+`just install` copies the extension into your user-local GNOME Shell extensions directory, compiles the extension GSettings schema, enables it with `gnome-extensions`, and prints a reminder if GNOME Shell needs a logout/login cycle before the icon appears.
 
 ## Update
 
@@ -34,7 +34,7 @@ git pull
 just update
 ```
 
-`just update` refreshes the installed files from your current checkout and re-enables the extension when possible.
+`just update` refreshes the installed files from your current checkout, recompiles the extension schema, and re-enables the extension when possible.
 
 ## Uninstall
 
@@ -46,7 +46,9 @@ This removes only the installed copy from your user extensions directory. It doe
 
 ## Usage
 
-The extension watches `uupd.service` and `uupd.timer`. When automatic updates are enabled and an update is running, GNOME Shell shows the pulsing indicator in the top bar.
+The extension watches `uupd.service` and `uupd.timer` over D-Bus. The default visibility mode is `Auto`, which keeps the current top-bar behavior: hidden while inactive, pulsing while updates run, and a warning icon when the last automatic run fails.
+
+An optional `Always` visibility mode is available in the extension preferences. In that mode the indicator remains visible in the top bar even while `uupd.service` is inactive, using a neutral `folder-download-symbolic` idle icon without fake progress percentages.
 
 ## UX and status model
 
@@ -54,9 +56,16 @@ The extension shows the current systemd unit state that is available over D-Bus.
 
 Because `uupd` does not currently expose exact update progress to the extension, the indicator can show that an automatic update is running, failed, or is scheduled through `uupd.timer`, but it cannot show an exact percentage.
 
-If the last automatic `uupd.service` run fails, the top bar shows a warning icon instead of silently hiding the problem. The popup includes the systemd result and exit status when systemd exposes them.
+If the last automatic `uupd.service` run fails, the top bar shows a warning icon instead of silently hiding the problem. The popup includes the systemd result and exit status when systemd exposes them, and the warning can be dismissed for the current failed state.
 
-When `uupd.service` is inactive, the indicator stays hidden. The top bar appears only while an automatic update is actively running or when a failed run needs attention.
+When `uupd.service` is inactive, the indicator stays hidden in `Auto` mode. In `Always` mode it stays visible as a neutral idle indicator and shows the current service state, automatic updates status, next scheduled check, and last timer trigger when systemd exposes them.
+
+## Preferences
+
+Open the GNOME Extensions app or run `gnome-extensions prefs uupd-indicator@projectbluefin.io`, then choose one of:
+
+- `Auto: show only while updates run or when an update fails`
+- `Always: keep the indicator visible in the top bar`
 
 ## Status and logs
 
@@ -105,7 +114,7 @@ just update
 
 ### The icon is not visible
 
-- Make sure automatic updates are enabled with `ujust toggle-updates`.
+- In the default `Auto` mode, make sure automatic updates are enabled with `ujust toggle-updates`.
 - Confirm that `uupd.timer` exists and is enabled by running `just status`.
 - If the extension was just installed or updated, log out and log back in before assuming GNOME Shell failed to load it.
 
