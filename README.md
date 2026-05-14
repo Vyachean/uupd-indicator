@@ -56,6 +56,8 @@ Because `uupd` does not currently expose exact update progress to the extension,
 
 If the last automatic `uupd.service` run fails, the top bar shows a warning icon instead of silently hiding the problem. The popup includes the systemd result and exit status when systemd exposes them.
 
+When `uupd.service` is inactive, the indicator stays hidden. The top bar appears only while an automatic update is actively running or when a failed run needs attention.
+
 ## Status and logs
 
 Check whether the extension is installed and enabled, and whether the relevant systemd units exist:

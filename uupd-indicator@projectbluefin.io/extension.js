@@ -26,7 +26,6 @@ const DBUS_SERVICE_PATH = "/org/freedesktop/systemd1/unit/uupd_2eservice";
 const DBUS_TIMER_PATH = "/org/freedesktop/systemd1/unit/uupd_2etimer";
 const DBUS_CONNECTION = Gio.DBus.system;
 const DEBUG = false;
-const COMPLETED_VISIBILITY_MS = 5000;
 
 function debug(message) {
   if (DEBUG)
@@ -58,7 +57,6 @@ function normalizeOptionalNumber(value) {
 function isTimerEnabled(state) {
   return state.timerUnitFileState === "enabled"
     || state.timerUnitFileState === "enabled-runtime"
-    || state.timerUnitFileState === "static"
     || state.timerEnabled === true;
 }
 
@@ -123,8 +121,6 @@ function getServiceStateIconName(derivedState) {
   switch (derivedState) {
   case "failed":
     return "dialog-warning-symbolic";
-  case "completed":
-    return "emblem-ok-symbolic";
   case "updating":
     return "folder-download-symbolic";
   default:
@@ -141,7 +137,6 @@ function deriveIndicatorState(state, options = {}) {
   const serviceActiveState = state.serviceActiveState ?? state.serviceState ?? null;
   const serviceFailed = isServiceFailed(serviceActiveState);
   const serviceUpdating = isServiceUpdating(serviceActiveState);
-  const hasObservedCompletion = Boolean(options.hasObservedCompletion);
   const failureDismissed = Boolean(options.failureDismissed);
 
   let mode = "hidden";
@@ -150,8 +145,6 @@ function deriveIndicatorState(state, options = {}) {
     mode = "updating";
   else if (serviceFailed && !failureDismissed)
     mode = "failed";
-  else if (hasObservedCompletion)
-    mode = "completed";
 
   return {
     mode,
@@ -419,8 +412,6 @@ const UupdIndicator = GObject.registerClass(
       this._iconAnimation = null;
       this._dismissedFailedState = false;
       this._lastObservedServiceState = null;
-      this._completedVisibilitySource = null;
-      this._showCompletedState = false;
 
       this._icon = new St.Icon({
         icon_name: "folder-download-symbolic",
@@ -539,28 +530,6 @@ const UupdIndicator = GObject.registerClass(
         this._icon.opacity = 255;
     }
 
-    _stopCompletedVisibilityTimer() {
-      if (!this._completedVisibilitySource)
-        return;
-
-      GLib.source_remove(this._completedVisibilitySource);
-      this._completedVisibilitySource = null;
-    }
-
-    _startCompletedVisibilityTimer() {
-      this._stopCompletedVisibilityTimer();
-      this._completedVisibilitySource = GLib.timeout_add(
-        GLib.PRIORITY_DEFAULT,
-        COMPLETED_VISIBILITY_MS,
-        () => {
-          this._completedVisibilitySource = null;
-          this._showCompletedState = false;
-          this._updateIndicatorState();
-          return GLib.SOURCE_REMOVE;
-        }
-      );
-    }
-
     _setRowVisible(row, label, value) {
       const visible = value !== null && value !== undefined && value !== "";
       row.label.text = label;
@@ -582,8 +551,6 @@ const UupdIndicator = GObject.registerClass(
 
       if (derivedState.mode === "failed") {
         this._titleItem.label.text = _("Automatic update failed");
-      } else if (derivedState.mode === "completed") {
-        this._titleItem.label.text = _("Automatic update finished");
       } else {
         this._titleItem.label.text = _("System update in progress");
       }
@@ -632,9 +599,7 @@ const UupdIndicator = GObject.registerClass(
         _("Last run"),
         derivedState.mode === "failed"
           ? formatTimestamp(state.serviceInactiveEnterTimestamp)
-          : derivedState.mode === "completed"
-            ? formatTimestamp(state.serviceInactiveEnterTimestamp)
-            : null
+          : null
       );
       this._hintRow.item.visible = derivedState.mode === "failed";
       this._hintRow.label.text = derivedState.mode === "failed"
@@ -647,13 +612,6 @@ const UupdIndicator = GObject.registerClass(
     _updateSessionSignals(state) {
       const currentState = state.serviceActiveState ?? state.serviceState ?? null;
       const previousState = this._lastObservedServiceState;
-
-      if (previousState === "active" || previousState === "activating") {
-        if (currentState === "inactive" || currentState === "deactivating") {
-          this._showCompletedState = true;
-          this._startCompletedVisibilityTimer();
-        }
-      }
 
       if (previousState !== null && previousState !== currentState)
         this._dismissedFailedState = false;
@@ -670,7 +628,6 @@ const UupdIndicator = GObject.registerClass(
 
       const derivedState = deriveIndicatorState(state, {
         failureDismissed: this._dismissedFailedState,
-        hasObservedCompletion: this._showCompletedState,
       });
 
       this._icon.icon_name = derivedState.iconName;
@@ -693,7 +650,6 @@ const UupdIndicator = GObject.registerClass(
     destroy() {
       this._destroyed = true;
       this._stopIconAnimation();
-      this._stopCompletedVisibilityTimer();
 
       if (this._providerChangedId && this._provider) {
         this._provider.disconnect(this._providerChangedId);

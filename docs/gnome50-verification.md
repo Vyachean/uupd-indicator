@@ -126,7 +126,7 @@ The smoke test:
 
 The smoke test does not start `uupd.service` and does not trigger real system updates. It verifies extension loading, indicator registration, visibility changes for fake `active` / `activating` / `inactive` states, and actor cleanup on disable.
 
-It also verifies the fake failed-state warning path, session-only dismiss behavior, and timeout cleanup for the optional short-lived completion state.
+It also verifies the fake failed-state warning path and session-only dismiss behavior.
 
 Real visual behavior during an actual host update still needs natural observation during a real update window or a separate manual runtime check.
 

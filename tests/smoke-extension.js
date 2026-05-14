@@ -153,7 +153,6 @@ export function* run() {
   assert(!removedIndicator, "Indicator should be removed from status area after disable");
   assert(indicator._destroyed === true, "Indicator should be destroyed after disable");
   assert(indicator._iconAnimation === null, "Indicator animation should be cleaned up after disable");
-  assert(indicator._completedVisibilitySource === null, "Completed-state timeout source should be cleaned up after disable");
 }
 
 export function finish() {
