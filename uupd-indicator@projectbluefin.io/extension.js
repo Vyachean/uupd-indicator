@@ -11,64 +11,9 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 
 import { UupdIndicator } from "./lib/indicator.js";
-import { createExtensionSettings, getShowRebootRequired, SHOW_REBOOT_REQUIRED_KEY } from "./lib/settings.js";
-import { isServiceUpdating } from "./lib/state.js";
+import { createExtensionSettings } from "./lib/settings.js";
 import { SystemdUupdStateProvider } from "./lib/systemdProvider.js";
-import { checkDeploymentStatus } from "./lib/deploymentStatusProvider.js";
-
-function createDeploymentStatusCoordinator(provider, settings) {
-  let destroyed = false;
-  let checking = false;
-  let prevServiceUpdating = false;
-
-  async function check() {
-    if (destroyed || checking)
-      return;
-
-    if (!getShowRebootRequired(settings))
-      return;
-
-    checking = true;
-
-    try {
-      const result = await checkDeploymentStatus();
-
-      if (!destroyed)
-        provider.updateDeploymentStatus(result);
-    } catch (error) {
-      console.warn(`[uupd-indicator] Deployment status check error: ${error.message}`);
-    } finally {
-      checking = false;
-    }
-  }
-
-  const stateSignalId = provider.connect("state-changed", () => {
-    const state = provider.getState();
-    const nowUpdating = isServiceUpdating(state.serviceActiveState);
-
-    if (prevServiceUpdating && !nowUpdating)
-      check();
-
-    prevServiceUpdating = nowUpdating;
-  });
-
-  const settingsSignalId = settings?.connect(`changed::${SHOW_REBOOT_REQUIRED_KEY}`, () => {
-    if (getShowRebootRequired(settings))
-      check();
-  });
-
-  check();
-
-  return {
-    destroy() {
-      destroyed = true;
-      provider.disconnect(stateSignalId);
-
-      if (settingsSignalId)
-        settings?.disconnect(settingsSignalId);
-    },
-  };
-}
+import { createDeploymentStatusCoordinator } from "./lib/deploymentStatusCoordinator.js";
 
 export default class UupdIndicatorExtension extends Extension {
   enable() {

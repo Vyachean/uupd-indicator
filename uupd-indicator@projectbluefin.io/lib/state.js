@@ -7,10 +7,9 @@ import {
 
 export function createInitialState() {
   return {
-    deploymentStatus: null,
+    deploymentStatus: "unknown",
     deploymentStatusSource: null,
     deploymentStatusCheckedAt: null,
-    deploymentStatusError: null,
     timerEnabled: false,
     timerLoadState: null,
     timerUnitFileState: null,
@@ -83,7 +82,7 @@ function shouldPulseIcon(mode) {
 export function deriveIndicatorState(state, options = {}) {
   const timerEnabled = isTimerEnabled(state);
   const serviceActiveState = state.serviceActiveState ?? state.serviceState ?? null;
-  const deploymentStatus = state.deploymentStatus ?? null;
+  const deploymentStatus = state.deploymentStatus ?? "unknown";
   const serviceFailed = isServiceFailed(serviceActiveState);
   const serviceUpdating = isServiceUpdating(serviceActiveState);
   const rebootRequired = deploymentStatus === "reboot-required";

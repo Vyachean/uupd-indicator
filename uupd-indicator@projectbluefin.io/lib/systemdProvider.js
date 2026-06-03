@@ -74,13 +74,12 @@ export const StateProvider = GObject.registerClass(
       this.emit("state-changed");
     }
 
-    updateDeploymentStatus({ status, source, checkedAt, error }) {
+    updateDeploymentStatus({ status, source, checkedAt }) {
       this._setState({
         ...this._state,
-        deploymentStatus: status ?? null,
+        deploymentStatus: status ?? "unknown",
         deploymentStatusSource: source ?? null,
         deploymentStatusCheckedAt: checkedAt ?? null,
-        deploymentStatusError: error ?? null,
       });
     }
   }

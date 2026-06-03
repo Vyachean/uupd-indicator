@@ -53,7 +53,12 @@ export function parseRpmOstreeJson(json) {
   if (typeof defaultDeployment?.booted !== "boolean")
     return "unknown";
 
-  return defaultDeployment.booted ? "clean" : "reboot-required";
+  if (defaultDeployment.booted)
+    return "clean";
+
+  const hasBootedDeployment = deployments.some(d => d.booted === true);
+
+  return hasBootedDeployment ? "reboot-required" : "unknown";
 }
 
 export async function checkDeploymentStatus() {
@@ -65,7 +70,7 @@ export async function checkDeploymentStatus() {
     const status = parseBootcJson(json);
 
     if (status !== "unknown")
-      return { status, source: "bootc", checkedAt, error: null };
+      return { status, source: "bootc", checkedAt };
   } catch (error) {
     const msg = error?.message ?? String(error);
 
@@ -79,7 +84,7 @@ export async function checkDeploymentStatus() {
     const status = parseRpmOstreeJson(json);
 
     if (status !== "unknown")
-      return { status, source: "rpm-ostree", checkedAt, error: null };
+      return { status, source: "rpm-ostree", checkedAt };
   } catch (error) {
     const msg = error?.message ?? String(error);
 
@@ -87,5 +92,5 @@ export async function checkDeploymentStatus() {
       console.warn(`[uupd-indicator] rpm-ostree status check failed: ${msg}`);
   }
 
-  return { status: "unknown", source: null, checkedAt, error: null };
+  return { status: "unknown", source: null, checkedAt };
 }

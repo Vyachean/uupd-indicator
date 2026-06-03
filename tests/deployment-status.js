@@ -54,7 +54,17 @@ assert(
 
 assert(
   parseRpmOstreeJson({ deployments: [{ booted: false }, { booted: true }] }) === "reboot-required",
-  "rpm-ostree: first deployment booted=false means reboot-required"
+  "rpm-ostree: first deployment booted=false + another booted deployment means reboot-required"
+);
+
+assert(
+  parseRpmOstreeJson({ deployments: [{ booted: false }] }) === "unknown",
+  "rpm-ostree: first deployment booted=false with no other booted deployment means unknown"
+);
+
+assert(
+  parseRpmOstreeJson({ deployments: [{ booted: false }, { booted: false }] }) === "unknown",
+  "rpm-ostree: no booted deployment among multiple means unknown"
 );
 
 assert(
