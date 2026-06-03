@@ -4,6 +4,7 @@ import GLib from "gi://GLib";
 export const SETTINGS_SCHEMA_ID = "org.gnome.shell.extensions.uupd-indicator";
 export const SETTINGS_SCHEMA_PATH = "/org/gnome/shell/extensions/uupd-indicator/";
 export const VISIBILITY_MODE_KEY = "visibility-mode";
+export const SHOW_REBOOT_REQUIRED_KEY = "show-reboot-required";
 export const VISIBILITY_MODE_AUTO = "auto";
 export const VISIBILITY_MODE_ALWAYS = "always";
 
@@ -23,10 +24,11 @@ function coerceVisibilityMode(value) {
     : VISIBILITY_MODE_AUTO;
 }
 
-function createFallbackSettings() {
+export function createFallbackSettings() {
   const listeners = new Map();
   let nextListenerId = 1;
   let visibilityMode = VISIBILITY_MODE_AUTO;
+  let showRebootRequired = true;
 
   return {
     getVisibilityMode() {
@@ -37,9 +39,19 @@ function createFallbackSettings() {
       for (const callback of listeners.values())
         callback();
     },
+    getShowRebootRequired() {
+      return showRebootRequired;
+    },
+    setShowRebootRequired(nextValue) {
+      showRebootRequired = nextValue !== false;
+      for (const callback of listeners.values())
+        callback();
+    },
     connect(signal, callback) {
-      if (signal !== `changed::${VISIBILITY_MODE_KEY}`)
+      if (signal !== `changed::${VISIBILITY_MODE_KEY}`
+        && signal !== `changed::${SHOW_REBOOT_REQUIRED_KEY}`) {
         return 0;
+      }
 
       const id = nextListenerId++;
       listeners.set(id, callback);
@@ -66,6 +78,17 @@ function createSettingsFacade(settings) {
     },
     setVisibilityMode(nextMode) {
       settings.set_string(VISIBILITY_MODE_KEY, coerceVisibilityMode(nextMode));
+    },
+    getShowRebootRequired() {
+      try {
+        return settings.get_boolean(SHOW_REBOOT_REQUIRED_KEY);
+      } catch (error) {
+        logSchemaWarning(`Failed to read ${SHOW_REBOOT_REQUIRED_KEY}: ${error.message}`);
+        return true;
+      }
+    },
+    setShowRebootRequired(nextValue) {
+      settings.set_boolean(SHOW_REBOOT_REQUIRED_KEY, nextValue !== false);
     },
     connect(signal, callback) {
       return settings.connect(signal, callback);
@@ -113,4 +136,8 @@ export function createExtensionSettings(extension) {
 
 export function getVisibilityMode(settings) {
   return settings?.getVisibilityMode?.() ?? VISIBILITY_MODE_AUTO;
+}
+
+export function getShowRebootRequired(settings) {
+  return settings?.getShowRebootRequired?.() ?? true;
 }

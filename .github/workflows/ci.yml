@@ -25,6 +25,12 @@ jobs:
       - name: Compile GSettings schemas
         run: glib-compile-schemas uupd-indicator@projectbluefin.io/schemas
 
+      - name: Run settings fallback test
+        run: gjs -m tests/settings-fallback.js
+
+      - name: Run deployment status parser test
+        run: gjs -m tests/deployment-status.js
+
       - name: Check shell scripts syntax
         run: |
           bash -n scripts/collect-host-diagnostics.sh

@@ -7,6 +7,10 @@ import {
 
 export function createInitialState() {
   return {
+    deploymentStatus: null,
+    deploymentStatusSource: null,
+    deploymentStatusCheckedAt: null,
+    deploymentStatusError: null,
     timerEnabled: false,
     timerLoadState: null,
     timerUnitFileState: null,
@@ -61,6 +65,8 @@ function getServiceStateIconName(mode) {
   switch (mode) {
   case "failed":
     return "dialog-warning-symbolic";
+  case "reboot-required":
+    return "system-reboot-symbolic";
   case "updating":
     return "folder-download-symbolic";
   case "idle":
@@ -77,9 +83,12 @@ function shouldPulseIcon(mode) {
 export function deriveIndicatorState(state, options = {}) {
   const timerEnabled = isTimerEnabled(state);
   const serviceActiveState = state.serviceActiveState ?? state.serviceState ?? null;
+  const deploymentStatus = state.deploymentStatus ?? null;
   const serviceFailed = isServiceFailed(serviceActiveState);
   const serviceUpdating = isServiceUpdating(serviceActiveState);
+  const rebootRequired = deploymentStatus === "reboot-required";
   const failureDismissed = Boolean(options.failureDismissed);
+  const showRebootRequired = options.showRebootRequired !== false;
   const visibilityMode = options.visibilityMode === VISIBILITY_MODE_ALWAYS
     ? VISIBILITY_MODE_ALWAYS
     : VISIBILITY_MODE_AUTO;
@@ -90,6 +99,8 @@ export function deriveIndicatorState(state, options = {}) {
     mode = "updating";
   } else if (serviceFailed && !failureDismissed) {
     mode = "failed";
+  } else if (rebootRequired && showRebootRequired) {
+    mode = "reboot-required";
   } else if (visibilityMode === VISIBILITY_MODE_ALWAYS) {
     mode = "idle";
   }
@@ -100,8 +111,11 @@ export function deriveIndicatorState(state, options = {}) {
     pulsing: shouldPulseIcon(mode),
     timerEnabled,
     serviceActiveState,
+    deploymentStatus,
     serviceFailed,
     serviceUpdating,
+    rebootRequired,
+    showRebootRequired,
     visibilityMode,
     iconName: getServiceStateIconName(mode),
   };
