@@ -67,21 +67,24 @@ The report also states whether the installed extension path resolves to this che
 
 ## CI
 
-GitHub Actions runs the static checks on pull requests, pushes to `main`, and manual `workflow_dispatch` runs.
+GitHub Actions runs two workflows:
 
-The Fedora smoke path remains experimental and non-blocking. It is useful as a GNOME 50 tooling probe, but it is not a substitute for a real GNOME host session.
+- **`.github/workflows/ci.yml`** — required on every pull request and push to `main`. Runs `./scripts/ci-static.sh` inside a Fedora 44 container. A red check here means a deterministic project check failed.
+- **`.github/workflows/smoke.yml`** — optional, triggered only by `workflow_dispatch`. Runs the GNOME Shell runtime smoke test. It is non-blocking and does not gate merges.
+
+`scripts/ci-static.sh` is the local equivalent of required CI. Run it locally to reproduce what required CI checks.
 
 ### Testing matrix
 
 | Path | What it validates | What it does not prove |
 | --- | --- | --- |
-| `static` (required) | `metadata.json` parses cleanly, shell helper scripts pass `bash -n`, known debug leftovers are rejected, `gnome-extensions pack` builds the packaged zip | No GNOME Shell runtime coverage |
-| `smoke-fedora-container-probe` (experimental, non-blocking) | Fedora 44 provides GNOME Shell 50 tooling, `gnome-shell-test-tool` exposes `--extension`, the packaged extension startup is attempted with fake provider state and fake settings mode changes from `tests/smoke-extension.js` | No full GNOME host-session integration, no real systemd/logind/session-bus coverage, no real `uupd.service` behavior |
+| `required-static` (required) | `metadata.json` parses cleanly, GSettings schemas compile, GJS unit tests pass, shell scripts pass `bash -n`, known debug leftovers are rejected, `gnome-extensions pack` builds the packaged zip | No GNOME Shell runtime coverage |
+| `smoke-fedora-container-probe` (optional, non-blocking, `workflow_dispatch` only) | Fedora 44 provides GNOME Shell 50 tooling, `gnome-shell-test-tool` exposes `--extension`, the packaged extension startup is attempted with fake provider state from `tests/smoke-extension.js` | No full GNOME host-session integration, no real systemd/logind/session-bus coverage, no real `uupd.service` behavior |
 | Self-hosted Bluefin / GNOME 50 runner or manual host session | Real logged-in GNOME 50 host behavior, real D-Bus/session/system integration, real extension behavior on the target desktop | Not covered by GitHub-hosted container CI |
 
 Hosted GitHub Fedora containers do not provide a full systemd/logind/system-bus desktop environment. GNOME Shell 50 tooling is available there, but Shell UI startup can still fail before the extension meaningfully runs because the container lacks the host services that a real GNOME session expects.
 
-For that reason, `smoke-fedora-container-probe` is diagnostic only:
+For that reason, `smoke-fedora-container-probe` is diagnostic only and intentionally non-blocking:
 
 - it runs `gnome-shell-test-tool` against the packaged extension zip
 - it targets a Fedora GNOME userspace inside a GitHub Actions job container
@@ -92,21 +95,19 @@ For that reason, `smoke-fedora-container-probe` is diagnostic only:
 
 The Fedora probe prints `gnome-shell --version`, prints `gnome-shell-test-tool --help`, prints whether `DBUS_SESSION_BUS_ADDRESS` is set, and prints the `XDG_RUNTIME_DIR` path and permissions before attempting startup. When no session bus is already available, the smoke runner starts `gnome-shell-test-tool` inside `dbus-run-session`.
 
-Real host integration remains the responsibility of `./scripts/collect-host-diagnostics.sh` and a real GNOME 50 host session. The commented self-hosted Bluefin / GNOME 50 runner template in CI is the correct path for real host integration checks once such a runner exists.
+Real host integration remains the responsibility of `./scripts/collect-host-diagnostics.sh` and a real GNOME 50 host session. The commented self-hosted Bluefin / GNOME 50 runner template in the smoke workflow is the correct path for real host integration checks once such a runner exists.
 
 ## Verification
 
 ### Static checks
 
+Run the same script that required CI uses:
+
 ```bash
-python3 -m json.tool uupd-indicator@projectbluefin.io/metadata.json
-bash -n scripts/install-extension.sh
-bash -n scripts/collect-host-diagnostics.sh
-bash -n scripts/run-smoke-test.sh
-glib-compile-schemas uupd-indicator@projectbluefin.io/schemas
-gnome-extensions pack uupd-indicator@projectbluefin.io --force
-grep -R "console.log\|_iconToggle\|GETTEXT_DOMAIN\|DBUS_MANAGER_INTERFACE" -n uupd-indicator@projectbluefin.io || true
+./scripts/ci-static.sh
 ```
+
+This covers all deterministic checks: JSON validation, schema compilation, GJS unit tests, shell script syntax, debug symbol rejection, and extension packaging.
 
 ### Host diagnostics
 
