@@ -4,6 +4,7 @@ import {
   VISIBILITY_MODE_ALWAYS,
   VISIBILITY_MODE_AUTO,
 } from "./settings.js";
+import { isServiceUpdating, isServiceFailed } from "./predicates.js";
 
 export function createInitialState() {
   return {
@@ -34,13 +35,7 @@ export function isTimerEnabled(state) {
     || state.timerEnabled === true;
 }
 
-export function isServiceUpdating(serviceActiveState) {
-  return serviceActiveState === "active" || serviceActiveState === "activating";
-}
-
-export function isServiceFailed(serviceActiveState) {
-  return serviceActiveState === "failed";
-}
+export { isServiceUpdating, isServiceFailed };
 
 export function formatServiceStateLabel(activeState, subState) {
   if (!activeState)

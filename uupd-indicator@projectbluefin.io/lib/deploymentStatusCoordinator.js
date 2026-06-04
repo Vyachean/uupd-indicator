@@ -1,19 +1,27 @@
-import { isServiceUpdating } from "./state.js";
+import { isServiceUpdating } from "./predicates.js";
 import { getShowRebootRequired, SHOW_REBOOT_REQUIRED_KEY } from "./settings.js";
-import { checkDeploymentStatus } from "./deploymentStatusProvider.js";
+import { checkDeploymentStatus as defaultCheckDeploymentStatus } from "./deploymentStatusProvider.js";
 
 function clearDeploymentStatus(provider) {
   provider.updateDeploymentStatus({ status: "unknown", source: null, checkedAt: null });
 }
 
-export function createDeploymentStatusCoordinator(provider, settings) {
+export function createDeploymentStatusCoordinator(provider, settings, {
+  checkDeploymentStatus = defaultCheckDeploymentStatus,
+} = {}) {
   let destroyed = false;
   let checking = false;
+  let pendingCheck = false;
   let prevServiceUpdating = false;
 
   async function check() {
-    if (destroyed || checking)
+    if (destroyed)
       return;
+
+    if (checking) {
+      pendingCheck = true;
+      return;
+    }
 
     if (!getShowRebootRequired(settings))
       return;
@@ -23,12 +31,17 @@ export function createDeploymentStatusCoordinator(provider, settings) {
     try {
       const result = await checkDeploymentStatus();
 
-      if (!destroyed)
+      if (!destroyed && getShowRebootRequired(settings))
         provider.updateDeploymentStatus(result);
     } catch (error) {
       console.warn(`[uupd-indicator] Deployment status check error: ${error.message}`);
     } finally {
       checking = false;
+
+      if (pendingCheck) {
+        pendingCheck = false;
+        check();
+      }
     }
   }
 

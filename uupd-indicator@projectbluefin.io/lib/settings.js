@@ -25,10 +25,18 @@ function coerceVisibilityMode(value) {
 }
 
 export function createFallbackSettings() {
-  const listeners = new Map();
+  const listenersByKey = new Map([
+    [`changed::${VISIBILITY_MODE_KEY}`, new Map()],
+    [`changed::${SHOW_REBOOT_REQUIRED_KEY}`, new Map()],
+  ]);
   let nextListenerId = 1;
   let visibilityMode = VISIBILITY_MODE_AUTO;
   let showRebootRequired = true;
+
+  function emit(key) {
+    for (const callback of (listenersByKey.get(key) ?? new Map()).values())
+      callback();
+  }
 
   return {
     getVisibilityMode() {
@@ -36,32 +44,30 @@ export function createFallbackSettings() {
     },
     setVisibilityMode(nextMode) {
       visibilityMode = coerceVisibilityMode(nextMode);
-      for (const callback of listeners.values())
-        callback();
+      emit(`changed::${VISIBILITY_MODE_KEY}`);
     },
     getShowRebootRequired() {
       return showRebootRequired;
     },
     setShowRebootRequired(nextValue) {
       showRebootRequired = nextValue !== false;
-      for (const callback of listeners.values())
-        callback();
+      emit(`changed::${SHOW_REBOOT_REQUIRED_KEY}`);
     },
     connect(signal, callback) {
-      if (signal !== `changed::${VISIBILITY_MODE_KEY}`
-        && signal !== `changed::${SHOW_REBOOT_REQUIRED_KEY}`) {
+      if (!listenersByKey.has(signal))
         return 0;
-      }
 
       const id = nextListenerId++;
-      listeners.set(id, callback);
+      listenersByKey.get(signal).set(id, callback);
       return id;
     },
     disconnect(id) {
-      listeners.delete(id);
+      for (const keyListeners of listenersByKey.values())
+        keyListeners.delete(id);
     },
     destroy() {
-      listeners.clear();
+      for (const keyListeners of listenersByKey.values())
+        keyListeners.clear();
     },
   };
 }
