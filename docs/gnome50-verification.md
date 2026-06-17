@@ -37,7 +37,9 @@ Host diagnostics on Bluefin GNOME 50 confirmed that `uupd.timer` and `uupd.servi
 
 The extension intentionally reflects only systemd state that is available over D-Bus. Without changes in `uupd`, exact package-level progress or percentages are not available to the Shell extension. Failed automatic runs are surfaced as a warning icon, using `uupd.service` state plus best-effort `Result` and `ExecMainStatus` details when systemd exposes them.
 
-The default visibility mode is `auto`: inactive or missing service state stays hidden, active or activating with the timer enabled shows a pulsing download icon, and failed runs show a warning icon until dismissed or until service state changes. An optional `always` mode keeps the indicator visible in a neutral idle state even when `uupd.service` is inactive or unavailable.
+Restart-required status is not inferred from successful service completion alone. When the restart-required preference is enabled, the extension performs a separate timeout-bounded deployment-status probe with `bootc status --json` first and `rpm-ostree status --json` as a fallback. Unknown probe results keep the restart-required state unknown instead of showing a false restart prompt.
+
+The default visibility mode is `auto`: inactive or missing service state stays hidden, active or activating with the timer enabled shows a pulsing download icon, staged deployment status shows a restart-required icon when enabled, and failed runs show a warning icon until dismissed or until service state changes. An optional `always` mode keeps the indicator visible in a neutral idle state even when `uupd.service` is inactive or unavailable.
 
 Primary checks:
 
@@ -46,6 +48,13 @@ systemctl show uupd.timer -p LoadState -p UnitFileState -p ActiveState -p SubSta
 systemctl show uupd.service -p LoadState -p UnitFileState -p ActiveState -p SubState -p FragmentPath
 busctl --system get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/uupd_2etimer org.freedesktop.systemd1.Unit UnitFileState
 busctl --system get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/uupd_2eservice org.freedesktop.systemd1.Unit ActiveState
+```
+
+Deployment status checks:
+
+```bash
+bootc status --json
+rpm-ostree status --json
 ```
 
 Comparison checks:
@@ -132,7 +141,7 @@ The smoke test:
 
 The smoke test does not start `uupd.service` and does not trigger real system updates. It verifies extension loading, indicator registration, visibility changes for fake `active` / `activating` / `inactive` states, and actor cleanup on disable.
 
-It also verifies the fake failed-state warning path, session-only dismiss behavior in `auto` mode, and the idle fallback path in `always` mode.
+It also verifies the fake failed-state warning path, session-only dismiss behavior in `auto` mode, restart-required icon behavior, and the idle fallback path in `always` mode.
 
 Real visual behavior during an actual host update still needs natural observation during a real update window or a separate manual runtime check.
 
