@@ -7,6 +7,7 @@
 ![total bar](/screenshots/screenshot1.png)
 ![detail](/screenshots/screenshot2.png)
 ![on click](/screenshots/screenshot3.png)
+![restart required](/screenshots/screenshot-reboot-required-indicator.png)
 
 ## Why this exists
 
