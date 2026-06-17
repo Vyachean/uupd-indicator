@@ -76,6 +76,8 @@ An optional `Always` visibility mode is available in the extension preferences. 
 
 The extension shows the current systemd unit state that is available over D-Bus. It does not parse `journalctl`, it does not shell out for normal UI updates, and it does not invent exact package-level progress.
 
+Deployment status checks are the only subprocess-based probe. When restart-required status is enabled, the extension asynchronously runs `bootc status --json` when `bootc` is available, then falls back to `rpm-ostree status --json`. Each probe is timeout-bounded. If neither command is available, or if neither command can prove a clean or staged deployment state, restart-required remains unknown and no restart icon is shown.
+
 Because `uupd` does not currently expose exact update progress to the extension, the indicator can show that an automatic update is running, failed, staged for reboot, or is scheduled through `uupd.timer`, but it cannot show an exact percentage.
 
 If the last automatic `uupd.service` run fails, the top bar shows a warning icon instead of silently hiding the problem. The popup includes the systemd result and exit status when systemd exposes them, and the warning can be dismissed for the current failed state.
@@ -96,7 +98,7 @@ When `uupd.service` is inactive, the indicator stays hidden in `Auto` mode unles
 
 Open the GNOME Extensions app or run `gnome-extensions prefs uupd-indicator@projectbluefin.io`, then choose one of:
 
-- `Auto`: show only while updates run or when an update fails
+- `Auto`: show only while updates run, when a staged deployment requires reboot, or when an update fails
 - `Always`: keep the indicator visible in the top bar
 - `Show restart-required status`: keep the indicator visible when a staged deployment requires reboot; disable it to hide that state in `Auto` mode and fall back to idle in `Always` mode
 
