@@ -1,5 +1,6 @@
 import {
   createFallbackSettings,
+  createSettingsFacade,
   getShowRebootRequired,
   SHOW_REBOOT_REQUIRED_KEY,
   VISIBILITY_MODE_KEY,
@@ -67,3 +68,49 @@ assert(visibilityChangedCount === 1, "Disconnected listener should not receive f
 assert(rebootChangedCount === 1, "Unrelated listener should not be affected by disconnect");
 
 s2.destroy();
+
+// --- Outdated schema protection on writes ---
+
+function createThrowingMockGioSettings() {
+  return {
+    get_string() {
+      throw new Error("schema has no key 'visibility-mode'");
+    },
+    set_string() {
+      throw new Error("schema has no key 'visibility-mode'");
+    },
+    get_boolean() {
+      throw new Error("schema has no key 'show-reboot-required'");
+    },
+    set_boolean() {
+      throw new Error("schema has no key 'show-reboot-required'");
+    },
+    connect() {
+      return 0;
+    },
+    disconnect() {
+    },
+  };
+}
+
+const throwingFacade = createSettingsFacade(createThrowingMockGioSettings());
+
+let setVisibilityModeThrew = false;
+
+try {
+  throwingFacade.setVisibilityMode("always");
+} catch {
+  setVisibilityModeThrew = true;
+}
+
+assert(!setVisibilityModeThrew, "setVisibilityMode should not throw when the underlying schema is outdated");
+
+let setShowRebootRequiredThrew = false;
+
+try {
+  throwingFacade.setShowRebootRequired(false);
+} catch {
+  setShowRebootRequiredThrew = true;
+}
+
+assert(!setShowRebootRequiredThrew, "setShowRebootRequired should not throw when the underlying schema is outdated");

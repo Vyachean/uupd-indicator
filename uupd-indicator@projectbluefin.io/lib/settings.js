@@ -72,7 +72,7 @@ export function createFallbackSettings() {
   };
 }
 
-function createSettingsFacade(settings) {
+export function createSettingsFacade(settings) {
   return {
     getVisibilityMode() {
       try {
@@ -83,7 +83,11 @@ function createSettingsFacade(settings) {
       }
     },
     setVisibilityMode(nextMode) {
-      settings.set_string(VISIBILITY_MODE_KEY, coerceVisibilityMode(nextMode));
+      try {
+        settings.set_string(VISIBILITY_MODE_KEY, coerceVisibilityMode(nextMode));
+      } catch (error) {
+        logSchemaWarning(`Failed to write ${VISIBILITY_MODE_KEY}: ${error.message}`);
+      }
     },
     getShowRebootRequired() {
       try {
@@ -94,7 +98,11 @@ function createSettingsFacade(settings) {
       }
     },
     setShowRebootRequired(nextValue) {
-      settings.set_boolean(SHOW_REBOOT_REQUIRED_KEY, nextValue !== false);
+      try {
+        settings.set_boolean(SHOW_REBOOT_REQUIRED_KEY, nextValue !== false);
+      } catch (error) {
+        logSchemaWarning(`Failed to write ${SHOW_REBOOT_REQUIRED_KEY}: ${error.message}`);
+      }
     },
     connect(signal, callback) {
       return settings.connect(signal, callback);

@@ -1,4 +1,7 @@
+import GLib from "gi://GLib";
+
 import {
+  checkDeploymentStatus,
   parseBootcJson,
   parseRpmOstreeJson,
 } from "../uupd-indicator@projectbluefin.io/lib/deploymentStatusProvider.js";
@@ -96,3 +99,23 @@ assert(
   parseRpmOstreeJson({ deployments: null }) === "unknown",
   "rpm-ostree: null deployments means unknown"
 );
+
+// --- checkDeploymentStatus: missing-command handling ---
+// This sandbox/CI runner does not have bootc or rpm-ostree installed, which lets us
+// verify the missing-command path silently skips both checks without warning.
+
+if (!GLib.find_program_in_path("bootc") && !GLib.find_program_in_path("rpm-ostree")) {
+  // console.warn is read-only in this gjs environment and cannot be stubbed, so this
+  // only verifies the resolved status; absence of warning output is checked by reading
+  // the test's own stderr output manually (no Gjs-WARNING lines for "bootc"/"rpm-ostree").
+  const result = await checkDeploymentStatus();
+
+  assert(
+    result.status === "unknown" && result.source === null,
+    "checkDeploymentStatus should report unknown/null source when neither tool is installed"
+  );
+} else {
+  console.warn(
+    "[uupd-indicator tests] Skipping missing-command test: bootc or rpm-ostree is installed on this runner"
+  );
+}
