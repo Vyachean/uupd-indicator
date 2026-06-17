@@ -14,6 +14,7 @@ function assert(condition, message) {
 const settings = createFallbackSettings();
 
 assert(getShowRebootRequired(null) === true, "Helper should default show-reboot-required to true when settings are unavailable");
+assert(getShowRebootRequired({}) === true, "Helper should default show-reboot-required to true when a facade does not expose the getter");
 assert(getShowRebootRequired(settings) === true, "Default show-reboot-required should be true");
 assert(settings.getShowRebootRequired() === true, "Fallback settings should expose show-reboot-required as true by default");
 
