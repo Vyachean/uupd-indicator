@@ -35,7 +35,7 @@ journalctl -f -o cat /usr/bin/gnome-shell | grep -Ei 'uupd|JS ERROR|extension'
 
 Host diagnostics on Bluefin GNOME 50 confirmed that `uupd.timer` and `uupd.service` are system units, while user-unit checks returned `LoadState=not-found`.
 
-The extension intentionally reflects only systemd state that is available over D-Bus. Without changes in `uupd`, exact package-level progress or percentages are not available to the Shell extension. Failed automatic runs are surfaced as a warning icon, using `uupd.service` state plus best-effort `Result` and `ExecMainStatus` details when systemd exposes them.
+The extension intentionally reflects only the limited update status it can safely derive from systemd and deployment checks. Without changes in `uupd`, exact package-level progress, internal update phases, or percentages are not available to the Shell extension. Failed automatic runs are surfaced as a warning icon, using `uupd.service` state plus best-effort `Result` and `ExecMainStatus` details when systemd exposes them.
 
 Restart-required status is not inferred from successful service completion alone. When the restart-required preference is enabled, the extension performs a separate timeout-bounded deployment-status probe with `bootc status --json` first and `rpm-ostree status --json` as a fallback. Unknown probe results keep the restart-required state unknown instead of showing a false restart prompt.
 
@@ -139,7 +139,7 @@ The smoke test:
 - installs the packaged zip into that test environment
 - drives the indicator through fake provider state only
 
-The smoke test does not start `uupd.service` and does not trigger real system updates. It verifies extension loading, indicator registration, visibility changes for fake `active` / `activating` / `inactive` states, and actor cleanup on disable.
+The smoke test does not start `uupd.service` and does not trigger real system updates. It verifies extension loading, indicator registration, visibility changes for fake `active` / `activating` / `inactive` states, the neutral updating popup status text, and actor cleanup on disable.
 
 It also verifies the fake failed-state warning path, session-only dismiss behavior in `auto` mode, restart-required icon behavior, and the idle fallback path in `always` mode.
 
