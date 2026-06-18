@@ -75,11 +75,11 @@ An optional `Always` visibility mode is available in the extension preferences. 
 
 ## UX and status model
 
-The extension shows the current systemd unit state that is available over D-Bus. It does not parse `journalctl`, it does not shell out for normal UI updates, and it does not invent exact package-level progress.
+The extension shows that an automatic update is running, has failed, is staged for reboot, or is idle based on the systemd and deployment signals it can safely observe. It does not parse `journalctl`, it does not shell out for normal UI updates, and it does not invent exact package-level or phase-level progress.
 
 Deployment status checks are the only subprocess-based probe. When restart-required status is enabled, the extension asynchronously runs `bootc status --json` when `bootc` is available, then falls back to `rpm-ostree status --json`. Each probe is timeout-bounded. If neither command is available, or if neither command can prove a clean or staged deployment state, restart-required remains unknown and no restart icon is shown.
 
-Because `uupd` does not currently expose exact update progress to the extension, the indicator can show that an automatic update is running, failed, staged for reboot, or is scheduled through `uupd.timer`, but it cannot show an exact percentage.
+Because `uupd` does not currently expose a stable progress API to the extension, the indicator can show that an automatic update is running, failed, staged for reboot, or is scheduled through `uupd.timer`, but it cannot show internal phases, exact percentages, or package-by-package progress.
 
 If the last automatic `uupd.service` run fails, the top bar shows a warning icon instead of silently hiding the problem. The popup includes the systemd result and exit status when systemd exposes them, and the warning can be dismissed for the current failed state.
 

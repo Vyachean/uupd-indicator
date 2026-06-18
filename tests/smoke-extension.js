@@ -55,6 +55,16 @@ function assertPulsing(expectedPulsing, message) {
   assert(Boolean(indicator?._iconAnimation) === expectedPulsing, message);
 }
 
+function assertPopupValueRow(rowName, expectedLabel, expectedValue, message) {
+  const indicator = getIndicator();
+  const row = indicator?._rows?.[rowName];
+
+  assert(row, `Popup row '${rowName}' should exist`);
+  assert(row.item.visible === true, `${message}: row should be visible`);
+  assert(row.label.text === expectedLabel, `${message}: expected label '${expectedLabel}', got '${row.label.text}'`);
+  assert(row.value.text === expectedValue, `${message}: expected value '${expectedValue}', got '${row.value.text}'`);
+}
+
 export function* run() {
   yield Scripting.waitLeisure();
 
@@ -84,6 +94,7 @@ export function* run() {
   assertIndicatorVisibility(true, "Indicator should be visible when timer is enabled and service is active");
   assertPulsing(true, "Indicator should pulse when service is active");
   assertIconName("folder-download-symbolic", "Indicator should use the download icon while updating");
+  assertPopupValueRow("status", "Status", "Updating", "Updating popup should use a neutral status row");
 
   indicator.setStateForTesting({
     timerEnabled: false,
@@ -169,6 +180,7 @@ export function* run() {
   assertIndicatorVisibility(true, "Indicator should be visible when timer is enabled and service is failed");
   assertPulsing(false, "Indicator should not pulse when service is failed");
   assertIconName("dialog-warning-symbolic", "Indicator should use the warning icon when service is failed");
+  assertPopupValueRow("state", "State", "Failed", "Failed popup should keep the diagnostic service state row");
 
   indicator._dismissItem.activate(0);
   yield Scripting.waitLeisure();

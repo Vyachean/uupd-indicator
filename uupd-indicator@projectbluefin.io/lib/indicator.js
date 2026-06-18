@@ -284,13 +284,13 @@ export const UupdIndicator = GObject.registerClass(
     }
 
     _updateUpdatingPopup(state, derivedState) {
-      const { state: serviceState, elapsed, automaticUpdates } = this._rows;
+      const { status, elapsed, automaticUpdates } = this._rows;
 
       this._titleItem.label.text = _("System update in progress");
       this._setRowVisible(
-        serviceState,
-        _("State"),
-        formatServiceStateLabel(state.serviceActiveState, state.serviceSubState)
+        status,
+        _("Status"),
+        _("Updating")
       );
       this._setRowVisible(
         elapsed,
