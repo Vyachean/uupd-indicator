@@ -8,7 +8,9 @@ import {
 
 import {
   createExtensionSettings,
+  getShowRebootRequired,
   getVisibilityMode,
+  SHOW_REBOOT_REQUIRED_KEY,
   VISIBILITY_MODE_ALWAYS,
   VISIBILITY_MODE_AUTO,
 } from "./lib/settings.js";
@@ -54,9 +56,40 @@ export default class UupdIndicatorPreferences extends ExtensionPreferences {
     syncVisibilityRow(row);
     row.connect("notify::selected", syncVisibilityRow);
 
+    const rebootRow = new Adw.SwitchRow({
+      title: _("Show restart-required status"),
+      subtitle: _("Keep the indicator visible when a system update is staged and a restart is required."),
+      active: getShowRebootRequired(settings),
+    });
+    let syncingRebootRow = false;
+
+    rebootRow.connect("notify::active", switchRow => {
+      if (syncingRebootRow)
+        return;
+
+      settings.setShowRebootRequired(switchRow.active);
+    });
+
+    const rebootSettingsChangedId = settings.connect(`changed::${SHOW_REBOOT_REQUIRED_KEY}`, () => {
+      const nextValue = getShowRebootRequired(settings);
+
+      if (rebootRow.active === nextValue)
+        return;
+
+      syncingRebootRow = true;
+      rebootRow.active = nextValue;
+      syncingRebootRow = false;
+    });
+
     group.add(row);
+    group.add(rebootRow);
     page.add(group);
     window.add(page);
-    window.connect("destroy", () => settings.destroy?.());
+    window.connect("destroy", () => {
+      if (rebootSettingsChangedId)
+        settings.disconnect?.(rebootSettingsChangedId);
+
+      settings.destroy?.();
+    });
   }
 }

@@ -1,12 +1,13 @@
 # Universal Blue Update Indicator
 
-`uupd-indicator` is a GNOME Shell extension for Universal Blue, Bluefin, and compatible systems that expose `uupd.service` and `uupd.timer`. By default it shows a pulsing download indicator only while automatic updates are running, and a warning icon when the last automatic run fails.
+`uupd-indicator` is a GNOME Shell extension for Universal Blue, Bluefin, and compatible systems that expose `uupd.service` and `uupd.timer`. By default it shows a pulsing download indicator only while automatic updates are running, a restart-required icon when an update is staged and waiting for reboot, and a warning icon when the last automatic run fails.
 
 [screencast](https://github.com/user-attachments/assets/bfa39984-85b9-4b1c-b3bd-faae13dd6f76)
 
 ![total bar](/screenshots/screenshot1.png)
 ![detail](/screenshots/screenshot2.png)
 ![on click](/screenshots/screenshot3.png)
+![restart required](/screenshots/screenshot-reboot-required-indicator.png)
 
 ## Why this exists
 
@@ -66,28 +67,41 @@ This removes only the installed copy from your user extensions directory. It doe
 
 ## Usage
 
-The extension watches `uupd.service` and `uupd.timer` over D-Bus. The default visibility mode is `Auto`, which keeps the current top-bar behavior: hidden while inactive, pulsing while updates run, and a warning icon when the last automatic run fails.
+The extension watches `uupd.service` and `uupd.timer` over D-Bus. The default visibility mode is `Auto`, which keeps the current top-bar behavior: hidden while inactive, pulsing while updates run, showing a restart-required icon when a staged deployment requires reboot, and showing a warning icon when the last automatic run fails.
 
 When the indicator is visible, update-related background work may be one reason for temporary CPU, disk, network, battery, or thermal activity.
 
-An optional `Always` visibility mode is available in the extension preferences. In that mode the indicator remains visible in the top bar even while `uupd.service` is inactive, using a neutral `view-refresh-symbolic` idle icon without fake progress percentages.
+An optional `Always` visibility mode is available in the extension preferences. In that mode the indicator remains visible in the top bar even while `uupd.service` is inactive, using a neutral `view-refresh-symbolic` idle icon without fake progress percentages unless a higher-priority updating, failed, or restart-required state applies.
 
 ## UX and status model
 
 The extension shows the current systemd unit state that is available over D-Bus. It does not parse `journalctl`, it does not shell out for normal UI updates, and it does not invent exact package-level progress.
 
-Because `uupd` does not currently expose exact update progress to the extension, the indicator can show that an automatic update is running, failed, or is scheduled through `uupd.timer`, but it cannot show an exact percentage.
+Deployment status checks are the only subprocess-based probe. When restart-required status is enabled, the extension asynchronously runs `bootc status --json` when `bootc` is available, then falls back to `rpm-ostree status --json`. Each probe is timeout-bounded. If neither command is available, or if neither command can prove a clean or staged deployment state, restart-required remains unknown and no restart icon is shown.
+
+Because `uupd` does not currently expose exact update progress to the extension, the indicator can show that an automatic update is running, failed, staged for reboot, or is scheduled through `uupd.timer`, but it cannot show an exact percentage.
 
 If the last automatic `uupd.service` run fails, the top bar shows a warning icon instead of silently hiding the problem. The popup includes the systemd result and exit status when systemd exposes them, and the warning can be dismissed for the current failed state.
 
-When `uupd.service` is inactive, the indicator stays hidden in `Auto` mode. In `Always` mode it stays visible as a neutral idle indicator and shows only a compact user-facing summary with status, automatic updates state, and the next scheduled check when systemd exposes it.
+Restart-required is derived separately from service activity. A successful `uupd.service` completion by itself is not treated as restart-required; that status must come from a dedicated deployment-status source.
+
+The indicator state priority is:
+
+1. `updating`
+2. `failed` unless dismissed
+3. `reboot-required` when the restart-required preference is enabled
+4. `idle` in `Always` visibility mode
+5. `hidden`
+
+When `uupd.service` is inactive, the indicator stays hidden in `Auto` mode unless restart-required is active and enabled. In `Always` mode it stays visible as a neutral idle indicator and shows only a compact user-facing summary with status, automatic updates state, and the next scheduled check when systemd exposes it.
 
 ## Preferences
 
 Open the GNOME Extensions app or run `gnome-extensions prefs uupd-indicator@projectbluefin.io`, then choose one of:
 
-- `Auto`: show only while updates run or when an update fails
+- `Auto`: show only while updates run, when a staged deployment requires reboot, or when an update fails
 - `Always`: keep the indicator visible in the top bar
+- `Show restart-required status`: keep the indicator visible when a staged deployment requires reboot; disable it to hide that state in `Auto` mode and fall back to idle in `Always` mode
 
 ## Status and logs
 

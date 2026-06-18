@@ -12,5 +12,12 @@
         Controls whether the update indicator is shown only while updates run or fail, or remains visible in the top bar at all times.
       </description>
     </key>
+    <key name="show-reboot-required" type="b">
+      <default>true</default>
+      <summary>Show restart-required status</summary>
+      <description>
+        Keeps the indicator visible when a system update is staged and a restart is required.
+      </description>
+    </key>
   </schema>
 </schemalist>

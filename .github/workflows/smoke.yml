@@ -1,0 +1,54 @@
+name: GNOME smoke probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke-fedora-container-probe:
+    name: GNOME smoke probe / smoke-fedora-container-probe
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    container:
+      image: fedora:44
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install GNOME Shell test tooling
+        run: |
+          dnf install -y \
+            dbus-daemon \
+            findutils \
+            gnome-shell \
+            grep \
+            tar
+
+      - name: Probe GNOME Shell tooling
+        run: |
+          gnome-shell --version
+          gnome-shell-test-tool --help
+          if ! gnome-shell-test-tool --help 2>&1 | grep -F -- "--extension" >/dev/null; then
+            echo "Fedora smoke test cannot run: gnome-shell-test-tool is present, but this build does not support --extension."
+            echo "A GNOME Shell 50 or newer test environment is required for packaged-extension smoke testing."
+            exit 1
+          fi
+
+      - name: Run packaged-extension smoke test
+        run: ./scripts/run-smoke-test.sh
+
+  # Self-hosted template — enable once a real Bluefin/GNOME 50 runner exists.
+  #
+  # smoke-bluefin-host:
+  #   runs-on: [self-hosted, linux, gnome-50, bluefin]
+  #   steps:
+  #     - name: Check out repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Run packaged-extension smoke test
+  #       run: ./scripts/run-smoke-test.sh
+  #
+  #     - name: Collect host diagnostics
+  #       run: ./scripts/collect-host-diagnostics.sh

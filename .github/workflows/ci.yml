@@ -7,127 +7,31 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  static:
+  required-static:
     runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Install GNOME extension tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gnome-shell
-
-      - name: Validate metadata JSON
-        run: python3 -m json.tool uupd-indicator@projectbluefin.io/metadata.json
-
-      - name: Compile GSettings schemas
-        run: glib-compile-schemas uupd-indicator@projectbluefin.io/schemas
-
-      - name: Check shell scripts syntax
-        run: |
-          bash -n scripts/collect-host-diagnostics.sh
-          bash -n scripts/extension-logs.sh
-          bash -n scripts/extension-status.sh
-          bash -n scripts/install-extension.sh
-          bash -n scripts/run-smoke-test.sh
-          bash -n scripts/uninstall-extension.sh
-
-      - name: Reject debug leftovers
-        run: |
-          if grep -R "console.log\|_iconToggle\|GETTEXT_DOMAIN\|DBUS_MANAGER_INTERFACE" -n uupd-indicator@projectbluefin.io; then
-            echo "Unexpected debug or legacy symbol found"
-            exit 1
-          fi
-
-      - name: Pack extension zip
-        run: gnome-extensions pack uupd-indicator@projectbluefin.io --force
-
-  smoke-fedora-container-probe:
-    name: smoke-fedora-container-probe (experimental, non-blocking)
-    runs-on: ubuntu-latest
-    continue-on-error: true
     container:
       image: fedora:44
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install GNOME Shell test tooling
+      - name: Install required packages
         run: |
           dnf install -y \
+            bash \
             dbus-daemon \
             findutils \
+            glib2 \
+            gjs \
             gnome-shell \
             grep \
+            python3 \
             tar
 
-      - name: Probe GNOME Shell tooling
-        run: |
-          gnome-shell --version
-          gnome-shell-test-tool --help
-          if ! gnome-shell-test-tool --help 2>&1 | grep -F -- "--extension" >/dev/null; then
-            echo "Fedora smoke test cannot run: gnome-shell-test-tool is present, but this build does not support --extension."
-            echo "A GNOME Shell 50 or newer test environment is required for packaged-extension smoke testing."
-            exit 1
-          fi
-
-      - name: Run packaged-extension smoke test
-        run: ./scripts/run-smoke-test.sh
-
-  # Enable this fallback only if fedora:44 stops being suitable on GitHub-hosted
-  # runners and you need a faster way to probe newer GNOME Shell tooling.
-  #
-  # smoke-fedora-rawhide:
-  #   if: github.event_name == 'workflow_dispatch'
-  #   runs-on: ubuntu-latest
-  #   continue-on-error: true
-  #   container:
-  #     image: fedora:rawhide
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #   steps:
-  #     - name: Check out repository
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Install GNOME Shell test tooling
-  #       run: |
-  #         dnf install -y \
-  #           findutils \
-  #           gnome-shell \
-  #           grep \
-  #           tar
-  #
-  #     - name: Probe GNOME Shell tooling
-  #       run: |
-  #         gnome-shell --version
-  #         gnome-shell-test-tool --help
-  #         if ! gnome-shell-test-tool --help 2>&1 | grep -F -- "--extension" >/dev/null; then
-  #           echo "Fedora Rawhide smoke test cannot run: gnome-shell-test-tool is present, but this build does not support --extension."
-  #           exit 1
-  #         fi
-  #
-  #     - name: Run packaged-extension smoke test
-  #       run: ./scripts/run-smoke-test.sh
-
-  # Self-hosted template for real host integration checks. This is the correct
-  # path for real GNOME host-session coverage once the runner exists and is
-  # stable. Do not enable as a required check until then.
-  #
-  # smoke-bluefin-host:
-  #   if: github.event_name == 'workflow_dispatch'
-  #   runs-on: [self-hosted, linux, gnome-50, bluefin]
-  #   steps:
-  #     - name: Check out repository
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Run packaged-extension smoke test
-  #       run: ./scripts/run-smoke-test.sh
-  #
-  #     - name: Collect host diagnostics
-  #       run: ./scripts/collect-host-diagnostics.sh
+      - name: Run static checks
+        run: ./scripts/ci-static.sh

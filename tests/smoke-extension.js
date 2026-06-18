@@ -62,8 +62,10 @@ export function* run() {
   assert(indicator, "Indicator was not added to Main.panel.statusArea");
   assert(typeof indicator.setStateForTesting === "function", "Indicator does not expose the expected smoke-test seam");
   assert(typeof indicator.setVisibilityModeForTesting === "function", "Indicator does not expose the expected settings seam");
+  assert(typeof indicator.setShowRebootRequiredForTesting === "function", "Indicator does not expose the expected reboot-required settings seam");
 
   indicator.setVisibilityModeForTesting(VISIBILITY_AUTO);
+  indicator.setShowRebootRequiredForTesting(true);
   indicator.setStateForTesting({
     timerEnabled: false,
     serviceState: "active",
@@ -101,6 +103,49 @@ export function* run() {
   yield Scripting.waitLeisure();
   assertIndicatorVisibility(true, "Indicator should be visible when timer is enabled and service is activating");
   assertPulsing(true, "Indicator should pulse when service is activating");
+
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    deploymentStatus: "reboot-required",
+    serviceState: "active",
+    serviceActiveState: "active",
+    timerUnitFileState: "enabled",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Updating should have priority over reboot-required");
+  assertPulsing(true, "Updating should keep pulsing when reboot-required is also present");
+  assertIconName("folder-download-symbolic", "Updating should keep the download icon when reboot-required is also present");
+
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    serviceState: "inactive",
+    serviceActiveState: "inactive",
+    timerUnitFileState: "enabled",
+    deploymentStatus: "reboot-required",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Indicator should be visible in auto mode when reboot-required is enabled");
+  assertPulsing(false, "Indicator should not pulse for reboot-required");
+  assertIconName("system-reboot-symbolic", "Indicator should use the reboot icon when restart is required");
+
+  indicator.setShowRebootRequiredForTesting(false);
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(false, "Indicator should hide reboot-required state in auto mode when the setting is disabled");
+
+  indicator.setShowRebootRequiredForTesting(true);
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    serviceState: "failed",
+    serviceActiveState: "failed",
+    serviceResult: "exit-code",
+    serviceExecMainStatus: 7,
+    timerUnitFileState: "enabled",
+    deploymentStatus: "reboot-required",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Failed state should still be visible when reboot-required is also present");
+  assertPulsing(false, "Failed state should not pulse when reboot-required is also present");
+  assertIconName("dialog-warning-symbolic", "Failed state should have priority over reboot-required");
 
   indicator.setStateForTesting({
     timerEnabled: true,
@@ -159,6 +204,32 @@ export function* run() {
   assertIndicatorVisibility(false, "Indicator should be hidden when timer is enabled and service state is missing");
 
   indicator.setVisibilityModeForTesting(VISIBILITY_ALWAYS);
+  indicator.setShowRebootRequiredForTesting(false);
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    deploymentStatus: "reboot-required",
+    serviceState: "inactive",
+    serviceActiveState: "inactive",
+    timerUnitFileState: "enabled",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Always mode should still show idle when reboot-required visibility is disabled");
+  assertPulsing(false, "Always mode idle should not pulse when reboot-required visibility is disabled");
+  assertIconName("view-refresh-symbolic", "Always mode should fall back to the idle icon when reboot-required visibility is disabled");
+
+  indicator.setShowRebootRequiredForTesting(true);
+  indicator.setStateForTesting({
+    timerEnabled: true,
+    deploymentStatus: "reboot-required",
+    serviceState: "inactive",
+    serviceActiveState: "inactive",
+    timerUnitFileState: "enabled",
+  });
+  yield Scripting.waitLeisure();
+  assertIndicatorVisibility(true, "Always mode should show reboot-required when that visibility is enabled");
+  assertPulsing(false, "Reboot-required should not pulse in always mode");
+  assertIconName("system-reboot-symbolic", "Always mode should use the reboot icon when restart is required");
+
   indicator.setStateForTesting({
     timerEnabled: true,
     serviceState: "inactive",

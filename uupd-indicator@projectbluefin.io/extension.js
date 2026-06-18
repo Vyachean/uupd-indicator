@@ -13,11 +13,13 @@ import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import { UupdIndicator } from "./lib/indicator.js";
 import { createExtensionSettings } from "./lib/settings.js";
 import { SystemdUupdStateProvider } from "./lib/systemdProvider.js";
+import { createDeploymentStatusCoordinator } from "./lib/deploymentStatusCoordinator.js";
 
 export default class UupdIndicatorExtension extends Extension {
   enable() {
     this._settings = createExtensionSettings(this);
     this._provider = new SystemdUupdStateProvider();
+    this._deploymentCoordinator = createDeploymentStatusCoordinator(this._provider, this._settings);
     this._indicator = new UupdIndicator({
       provider: this._provider,
       settings: this._settings,
@@ -26,6 +28,8 @@ export default class UupdIndicatorExtension extends Extension {
   }
 
   disable() {
+    this._deploymentCoordinator?.destroy();
+    this._deploymentCoordinator = null;
     this._indicator?.destroy();
     this._indicator = null;
     this._provider = null;

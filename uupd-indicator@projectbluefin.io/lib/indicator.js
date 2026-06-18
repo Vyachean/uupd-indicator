@@ -12,7 +12,10 @@ import {
   formatElapsedDuration,
   formatTimestamp,
 } from "./formatting.js";
-import { getVisibilityMode } from "./settings.js";
+import {
+  getShowRebootRequired,
+  getVisibilityMode,
+} from "./settings.js";
 import {
   createInitialState,
   deriveIndicatorState,
@@ -79,6 +82,7 @@ export const UupdIndicator = GObject.registerClass(
       this._providerChangedId = null;
       this._settings = settings;
       this._settingsChangedId = 0;
+      this._settingsShowRebootRequiredChangedId = 0;
       this._testProvider = null;
       this._pulseDirection = -1;
       this._pulseOpacity = 255;
@@ -111,6 +115,8 @@ export const UupdIndicator = GObject.registerClass(
         serviceResult: createValueRow(),
         exitStatus: createValueRow(),
         lastRun: createValueRow(),
+        source: createValueRow(),
+        lastChecked: createValueRow(),
       };
 
       for (const row of Object.values(this._rows)) {
@@ -142,6 +148,10 @@ export const UupdIndicator = GObject.registerClass(
         "changed::visibility-mode",
         () => this._updateIndicatorState()
       );
+      this._settingsShowRebootRequiredChangedId = this._settings.connect(
+        "changed::show-reboot-required",
+        () => this._updateIndicatorState()
+      );
     }
 
     _setProvider(provider) {
@@ -171,6 +181,11 @@ export const UupdIndicator = GObject.registerClass(
 
     setVisibilityModeForTesting(mode) {
       this._settings?.setVisibilityMode?.(mode);
+      this._updateIndicatorState();
+    }
+
+    setShowRebootRequiredForTesting(enabled) {
+      this._settings?.setShowRebootRequired?.(enabled);
       this._updateIndicatorState();
     }
 
@@ -253,6 +268,21 @@ export const UupdIndicator = GObject.registerClass(
       );
     }
 
+    _updateRebootRequiredPopup(state) {
+      const { status, source, lastChecked } = this._rows;
+
+      this._titleItem.label.text = _("Restart required");
+      this._setRowVisible(status, _("Status"), _("Restart required to apply system update"));
+      this._setRowVisible(source, _("Source"), state.deploymentStatusSource);
+      this._setRowVisible(
+        lastChecked,
+        _("Last checked"),
+        formatTimestamp(state.deploymentStatusCheckedAt
+          ? state.deploymentStatusCheckedAt * 1000
+          : null)
+      );
+    }
+
     _updateUpdatingPopup(state, derivedState) {
       const { state: serviceState, elapsed, automaticUpdates } = this._rows;
 
@@ -313,6 +343,11 @@ export const UupdIndicator = GObject.registerClass(
         return;
       }
 
+      if (derivedState.mode === "reboot-required") {
+        this._updateRebootRequiredPopup(state);
+        return;
+      }
+
       this._updateIdlePopup(state, derivedState);
     }
 
@@ -335,6 +370,7 @@ export const UupdIndicator = GObject.registerClass(
 
       const derivedState = deriveIndicatorState(state, {
         failureDismissed: this._dismissedFailedState,
+        showRebootRequired: getShowRebootRequired(this._settings),
         visibilityMode: getVisibilityMode(this._settings),
       });
 
@@ -367,6 +403,11 @@ export const UupdIndicator = GObject.registerClass(
       if (this._settingsChangedId && this._settings?.disconnect) {
         this._settings.disconnect(this._settingsChangedId);
         this._settingsChangedId = 0;
+      }
+
+      if (this._settingsShowRebootRequiredChangedId && this._settings?.disconnect) {
+        this._settings.disconnect(this._settingsShowRebootRequiredChangedId);
+        this._settingsShowRebootRequiredChangedId = 0;
       }
 
       this._provider?.destroy();

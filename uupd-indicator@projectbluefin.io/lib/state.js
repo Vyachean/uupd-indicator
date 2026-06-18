@@ -4,9 +4,13 @@ import {
   VISIBILITY_MODE_ALWAYS,
   VISIBILITY_MODE_AUTO,
 } from "./settings.js";
+import { isServiceUpdating, isServiceFailed } from "./predicates.js";
 
 export function createInitialState() {
   return {
+    deploymentStatus: "unknown",
+    deploymentStatusSource: null,
+    deploymentStatusCheckedAt: null,
     timerEnabled: false,
     timerLoadState: null,
     timerUnitFileState: null,
@@ -31,13 +35,7 @@ export function isTimerEnabled(state) {
     || state.timerEnabled === true;
 }
 
-export function isServiceUpdating(serviceActiveState) {
-  return serviceActiveState === "active" || serviceActiveState === "activating";
-}
-
-export function isServiceFailed(serviceActiveState) {
-  return serviceActiveState === "failed";
-}
+export { isServiceUpdating, isServiceFailed };
 
 export function formatServiceStateLabel(activeState, subState) {
   if (!activeState)
@@ -61,6 +59,8 @@ function getServiceStateIconName(mode) {
   switch (mode) {
   case "failed":
     return "dialog-warning-symbolic";
+  case "reboot-required":
+    return "system-reboot-symbolic";
   case "updating":
     return "folder-download-symbolic";
   case "idle":
@@ -77,9 +77,12 @@ function shouldPulseIcon(mode) {
 export function deriveIndicatorState(state, options = {}) {
   const timerEnabled = isTimerEnabled(state);
   const serviceActiveState = state.serviceActiveState ?? state.serviceState ?? null;
+  const deploymentStatus = state.deploymentStatus ?? "unknown";
   const serviceFailed = isServiceFailed(serviceActiveState);
   const serviceUpdating = isServiceUpdating(serviceActiveState);
+  const rebootRequired = deploymentStatus === "reboot-required";
   const failureDismissed = Boolean(options.failureDismissed);
+  const showRebootRequired = options.showRebootRequired !== false;
   const visibilityMode = options.visibilityMode === VISIBILITY_MODE_ALWAYS
     ? VISIBILITY_MODE_ALWAYS
     : VISIBILITY_MODE_AUTO;
@@ -90,6 +93,8 @@ export function deriveIndicatorState(state, options = {}) {
     mode = "updating";
   } else if (serviceFailed && !failureDismissed) {
     mode = "failed";
+  } else if (rebootRequired && showRebootRequired) {
+    mode = "reboot-required";
   } else if (visibilityMode === VISIBILITY_MODE_ALWAYS) {
     mode = "idle";
   }
@@ -100,8 +105,11 @@ export function deriveIndicatorState(state, options = {}) {
     pulsing: shouldPulseIcon(mode),
     timerEnabled,
     serviceActiveState,
+    deploymentStatus,
     serviceFailed,
     serviceUpdating,
+    rebootRequired,
+    showRebootRequired,
     visibilityMode,
     iconName: getServiceStateIconName(mode),
   };

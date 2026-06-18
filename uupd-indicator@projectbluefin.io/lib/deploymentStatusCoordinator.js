@@ -1,0 +1,88 @@
+import Gio from "gi://Gio";
+
+import { isServiceUpdating } from "./predicates.js";
+import { getShowRebootRequired, SHOW_REBOOT_REQUIRED_KEY } from "./settings.js";
+import { checkDeploymentStatus as defaultCheckDeploymentStatus } from "./deploymentStatusProvider.js";
+
+function clearDeploymentStatus(provider) {
+  provider.updateDeploymentStatus({ status: "unknown", source: null, checkedAt: null });
+}
+
+export function createDeploymentStatusCoordinator(provider, settings, {
+  checkDeploymentStatus = defaultCheckDeploymentStatus,
+} = {}) {
+  let destroyed = false;
+  let checking = false;
+  let pendingCheck = false;
+  let prevServiceUpdating = false;
+  let activeCancellable = null;
+
+  async function check() {
+    if (destroyed)
+      return;
+
+    if (checking) {
+      pendingCheck = true;
+      return;
+    }
+
+    if (!getShowRebootRequired(settings))
+      return;
+
+    checking = true;
+    const cancellable = new Gio.Cancellable();
+    activeCancellable?.cancel();
+    activeCancellable = cancellable;
+
+    try {
+      const result = await checkDeploymentStatus(cancellable);
+
+      if (!destroyed && activeCancellable === cancellable && getShowRebootRequired(settings))
+        provider.updateDeploymentStatus(result);
+    } catch (error) {
+      if (!cancellable.is_cancelled())
+        console.warn(`[uupd-indicator] Deployment status check error: ${error.message}`);
+    } finally {
+      if (activeCancellable === cancellable)
+        activeCancellable = null;
+
+      checking = false;
+
+      if (pendingCheck) {
+        pendingCheck = false;
+        check();
+      }
+    }
+  }
+
+  const stateSignalId = provider.connect("state-changed", () => {
+    const state = provider.getState();
+    const nowUpdating = isServiceUpdating(state.serviceActiveState);
+
+    if (prevServiceUpdating && !nowUpdating)
+      check();
+
+    prevServiceUpdating = nowUpdating;
+  });
+
+  const settingsSignalId = settings?.connect(`changed::${SHOW_REBOOT_REQUIRED_KEY}`, () => {
+    clearDeploymentStatus(provider);
+
+    if (getShowRebootRequired(settings))
+      check();
+  });
+
+  check();
+
+  return {
+    destroy() {
+      destroyed = true;
+      activeCancellable?.cancel();
+      activeCancellable = null;
+      provider.disconnect(stateSignalId);
+
+      if (settingsSignalId)
+        settings?.disconnect(settingsSignalId);
+    },
+  };
+}

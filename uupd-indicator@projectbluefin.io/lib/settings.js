@@ -4,6 +4,7 @@ import GLib from "gi://GLib";
 export const SETTINGS_SCHEMA_ID = "org.gnome.shell.extensions.uupd-indicator";
 export const SETTINGS_SCHEMA_PATH = "/org/gnome/shell/extensions/uupd-indicator/";
 export const VISIBILITY_MODE_KEY = "visibility-mode";
+export const SHOW_REBOOT_REQUIRED_KEY = "show-reboot-required";
 export const VISIBILITY_MODE_AUTO = "auto";
 export const VISIBILITY_MODE_ALWAYS = "always";
 
@@ -23,10 +24,19 @@ function coerceVisibilityMode(value) {
     : VISIBILITY_MODE_AUTO;
 }
 
-function createFallbackSettings() {
-  const listeners = new Map();
+export function createFallbackSettings() {
+  const listenersByKey = new Map([
+    [`changed::${VISIBILITY_MODE_KEY}`, new Map()],
+    [`changed::${SHOW_REBOOT_REQUIRED_KEY}`, new Map()],
+  ]);
   let nextListenerId = 1;
   let visibilityMode = VISIBILITY_MODE_AUTO;
+  let showRebootRequired = true;
+
+  function emit(key) {
+    for (const callback of (listenersByKey.get(key) ?? new Map()).values())
+      callback();
+  }
 
   return {
     getVisibilityMode() {
@@ -34,27 +44,35 @@ function createFallbackSettings() {
     },
     setVisibilityMode(nextMode) {
       visibilityMode = coerceVisibilityMode(nextMode);
-      for (const callback of listeners.values())
-        callback();
+      emit(`changed::${VISIBILITY_MODE_KEY}`);
+    },
+    getShowRebootRequired() {
+      return showRebootRequired;
+    },
+    setShowRebootRequired(nextValue) {
+      showRebootRequired = nextValue !== false;
+      emit(`changed::${SHOW_REBOOT_REQUIRED_KEY}`);
     },
     connect(signal, callback) {
-      if (signal !== `changed::${VISIBILITY_MODE_KEY}`)
+      if (!listenersByKey.has(signal))
         return 0;
 
       const id = nextListenerId++;
-      listeners.set(id, callback);
+      listenersByKey.get(signal).set(id, callback);
       return id;
     },
     disconnect(id) {
-      listeners.delete(id);
+      for (const keyListeners of listenersByKey.values())
+        keyListeners.delete(id);
     },
     destroy() {
-      listeners.clear();
+      for (const keyListeners of listenersByKey.values())
+        keyListeners.clear();
     },
   };
 }
 
-function createSettingsFacade(settings) {
+export function createSettingsFacade(settings) {
   return {
     getVisibilityMode() {
       try {
@@ -65,7 +83,26 @@ function createSettingsFacade(settings) {
       }
     },
     setVisibilityMode(nextMode) {
-      settings.set_string(VISIBILITY_MODE_KEY, coerceVisibilityMode(nextMode));
+      try {
+        settings.set_string(VISIBILITY_MODE_KEY, coerceVisibilityMode(nextMode));
+      } catch (error) {
+        logSchemaWarning(`Failed to write ${VISIBILITY_MODE_KEY}: ${error.message}`);
+      }
+    },
+    getShowRebootRequired() {
+      try {
+        return settings.get_boolean(SHOW_REBOOT_REQUIRED_KEY);
+      } catch (error) {
+        logSchemaWarning(`Failed to read ${SHOW_REBOOT_REQUIRED_KEY}: ${error.message}`);
+        return true;
+      }
+    },
+    setShowRebootRequired(nextValue) {
+      try {
+        settings.set_boolean(SHOW_REBOOT_REQUIRED_KEY, nextValue !== false);
+      } catch (error) {
+        logSchemaWarning(`Failed to write ${SHOW_REBOOT_REQUIRED_KEY}: ${error.message}`);
+      }
     },
     connect(signal, callback) {
       return settings.connect(signal, callback);
@@ -113,4 +150,8 @@ export function createExtensionSettings(extension) {
 
 export function getVisibilityMode(settings) {
   return settings?.getVisibilityMode?.() ?? VISIBILITY_MODE_AUTO;
+}
+
+export function getShowRebootRequired(settings) {
+  return settings?.getShowRebootRequired?.() ?? true;
 }
