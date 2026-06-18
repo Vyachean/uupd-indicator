@@ -192,7 +192,11 @@ function createProvider(initialActiveState = "inactive") {
 // --- Test 6: Destroyed coordinator does not apply results ---
 {
   const resolvers = [];
-  const mockCheck = () => new Promise(resolve => resolvers.push(resolve));
+  const cancellables = [];
+  const mockCheck = cancellable => {
+    cancellables.push(cancellable);
+    return new Promise(resolve => resolvers.push(resolve));
+  };
 
   const provider = createProvider();
   const settings = createFallbackSettings();
@@ -201,9 +205,40 @@ function createProvider(initialActiveState = "inactive") {
   });
 
   coordinator.destroy();
+  assert(cancellables.length === 1, "Destroy test should start exactly one check");
+  assert(cancellables[0].is_cancelled(), "Destroy should cancel the active deployment check");
+
   resolvers[0]({ status: "reboot-required", source: "bootc", checkedAt: 1 });
   await flushMicrotasks();
 
   const nonUnknown = provider.getDeploymentUpdates().filter(u => u.status !== "unknown");
   assert(nonUnknown.length === 0, "Destroyed coordinator should not apply check result");
+}
+
+// --- Test 7: Destroy cancels a pending deployment check ---
+{
+  let capturedCancellable = null;
+  let cancelSignalCount = 0;
+  const mockCheck = cancellable => {
+    capturedCancellable = cancellable;
+    cancellable.connect(() => {
+      cancelSignalCount++;
+    });
+
+    return new Promise(() => {
+    });
+  };
+
+  const provider = createProvider();
+  const settings = createFallbackSettings();
+  const coordinator = createDeploymentStatusCoordinator(provider, settings, {
+    checkDeploymentStatus: mockCheck,
+  });
+
+  assert(capturedCancellable !== null, "Coordinator should pass a cancellable to deployment checks");
+
+  coordinator.destroy();
+
+  assert(capturedCancellable.is_cancelled(), "Destroy should cancel the in-flight deployment check");
+  assert(cancelSignalCount === 1, "Destroy should emit exactly one cancellation for the in-flight check");
 }

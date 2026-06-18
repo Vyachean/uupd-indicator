@@ -4,6 +4,7 @@ import {
   checkDeploymentStatus,
   parseBootcJson,
   parseRpmOstreeJson,
+  runCommandOutput,
 } from "../uupd-indicator@projectbluefin.io/lib/deploymentStatusProvider.js";
 
 function assert(condition, message) {
@@ -118,4 +119,116 @@ if (!GLib.find_program_in_path("bootc") && !GLib.find_program_in_path("rpm-ostre
   console.warn(
     "[uupd-indicator tests] Skipping missing-command test: bootc or rpm-ostree is installed on this runner"
   );
+}
+
+// --- runCommandOutput: timeout/cancellation cleanup ---
+{
+  const activeSourceIds = new Set();
+  let nextSourceId = 1;
+  let timeoutCallback = null;
+  let sourceRemoveCalls = 0;
+  let forceExitCalls = 0;
+  let disconnectCalls = 0;
+
+  const fakeGLib = {
+    PRIORITY_DEFAULT: 0,
+    SOURCE_REMOVE: false,
+    timeout_add(_priority, _timeoutMs, callback) {
+      const id = nextSourceId++;
+      activeSourceIds.add(id);
+      timeoutCallback = () => {
+        activeSourceIds.delete(id);
+        return callback();
+      };
+      return id;
+    },
+    source_remove(id) {
+      sourceRemoveCalls++;
+
+      if (!activeSourceIds.delete(id))
+        throw new Error(`source_remove called with invalid id ${id}`);
+
+      return true;
+    },
+  };
+
+  class FakeCancellable {
+    constructor() {
+      this._cancelled = false;
+      this._listeners = new Map();
+      this._nextId = 1;
+    }
+
+    cancel() {
+      if (this._cancelled)
+        return;
+
+      this._cancelled = true;
+
+      for (const callback of this._listeners.values())
+        callback();
+    }
+
+    connect(callback) {
+      const id = this._nextId++;
+      this._listeners.set(id, callback);
+
+      if (this._cancelled)
+        callback();
+
+      return id;
+    }
+
+    disconnect(id) {
+      disconnectCalls++;
+      this._listeners.delete(id);
+    }
+
+    is_cancelled() {
+      return this._cancelled;
+    }
+  }
+
+  const fakeGio = {
+    Cancellable: FakeCancellable,
+    SubprocessFlags: {
+      STDOUT_PIPE: 1,
+      STDERR_SILENCE: 2,
+    },
+  };
+
+  const runPromise = runCommandOutput(["fake-command"], null, {
+    glib: fakeGLib,
+    gio: fakeGio,
+    commandTimeoutMs: 1,
+    subprocessFactory() {
+      return {
+        async communicate_utf8_async(_stdin, cancellable) {
+          return new Promise((resolve, reject) => {
+            cancellable.connect(() => reject(new Error("cancelled")));
+          });
+        },
+        force_exit() {
+          forceExitCalls++;
+        },
+      };
+    },
+  });
+
+  assert(timeoutCallback !== null, "runCommandOutput should register a timeout source");
+  timeoutCallback();
+
+  let rejected = false;
+
+  try {
+    await runPromise;
+  } catch (error) {
+    rejected = true;
+    assert(error.message === "cancelled", "Timed out command should reject with cancellation");
+  }
+
+  assert(rejected, "Timed out command should reject");
+  assert(sourceRemoveCalls === 0, "Expired timeout source should not be removed again in finally");
+  assert(forceExitCalls >= 1, "Cancelled timed out command should force-exit the subprocess");
+  assert(disconnectCalls === 1, "runCommandOutput should disconnect its cancellable handler during cleanup");
 }

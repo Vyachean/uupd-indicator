@@ -5,30 +5,44 @@ Gio._promisify(Gio.Subprocess.prototype, "communicate_utf8_async", "communicate_
 
 const COMMAND_TIMEOUT_MS = 10000;
 
-async function runCommandOutput(argv) {
-  const cancellable = new Gio.Cancellable();
+export async function runCommandOutput(argv, cancellable = null, {
+  glib = GLib,
+  gio = Gio,
+  commandTimeoutMs = COMMAND_TIMEOUT_MS,
+  subprocessFactory = (subprocessArgv, flags) => gio.Subprocess.new(subprocessArgv, flags),
+} = {}) {
+  const commandCancellable = cancellable ?? new gio.Cancellable();
   let proc = null;
-  let timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, COMMAND_TIMEOUT_MS, () => {
-    cancellable.cancel();
-    proc?.force_exit();
+  let timeoutId = glib.timeout_add(glib.PRIORITY_DEFAULT, commandTimeoutMs, () => {
+    commandCancellable.cancel();
     timeoutId = 0;
-    return GLib.SOURCE_REMOVE;
+    return glib.SOURCE_REMOVE;
+  });
+  const cancelSignalId = commandCancellable.connect(() => {
+    proc?.force_exit();
   });
 
   try {
-    proc = Gio.Subprocess.new(
+    proc = subprocessFactory(
       argv,
-      Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE
+      gio.SubprocessFlags.STDOUT_PIPE | gio.SubprocessFlags.STDERR_SILENCE
     );
-    const [stdout] = await proc.communicate_utf8_async(null, cancellable);
+    const [stdout] = await proc.communicate_utf8_async(null, commandCancellable);
 
     if (!proc.get_successful())
       throw new Error(`${argv[0]} exited with status ${proc.get_exit_status()}`);
 
     return stdout ?? "";
+  } catch (error) {
+    if (commandCancellable.is_cancelled())
+      proc?.force_exit();
+
+    throw error;
   } finally {
+    commandCancellable.disconnect(cancelSignalId);
+
     if (timeoutId > 0) {
-      GLib.source_remove(timeoutId);
+      glib.source_remove(timeoutId);
       timeoutId = 0;
     }
   }
@@ -67,12 +81,12 @@ export function parseRpmOstreeJson(json) {
   return hasBootedDeployment ? "reboot-required" : "unknown";
 }
 
-export async function checkDeploymentStatus() {
+export async function checkDeploymentStatus(cancellable = null) {
   const checkedAt = Date.now();
 
   if (GLib.find_program_in_path("bootc")) {
     try {
-      const stdout = await runCommandOutput(["bootc", "status", "--json"]);
+      const stdout = await runCommandOutput(["bootc", "status", "--json"], cancellable);
       const json = JSON.parse(stdout);
       const status = parseBootcJson(json);
 
@@ -87,7 +101,7 @@ export async function checkDeploymentStatus() {
 
   if (GLib.find_program_in_path("rpm-ostree")) {
     try {
-      const stdout = await runCommandOutput(["rpm-ostree", "status", "--json"]);
+      const stdout = await runCommandOutput(["rpm-ostree", "status", "--json"], cancellable);
       const json = JSON.parse(stdout);
       const status = parseRpmOstreeJson(json);
 

@@ -70,7 +70,7 @@ export default class UupdIndicatorPreferences extends ExtensionPreferences {
       settings.setShowRebootRequired(switchRow.active);
     });
 
-    settings.connect(`changed::${SHOW_REBOOT_REQUIRED_KEY}`, () => {
+    const rebootSettingsChangedId = settings.connect(`changed::${SHOW_REBOOT_REQUIRED_KEY}`, () => {
       const nextValue = getShowRebootRequired(settings);
 
       if (rebootRow.active === nextValue)
@@ -85,6 +85,11 @@ export default class UupdIndicatorPreferences extends ExtensionPreferences {
     group.add(rebootRow);
     page.add(group);
     window.add(page);
-    window.connect("destroy", () => settings.destroy?.());
+    window.connect("destroy", () => {
+      if (rebootSettingsChangedId)
+        settings.disconnect?.(rebootSettingsChangedId);
+
+      settings.destroy?.();
+    });
   }
 }
