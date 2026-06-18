@@ -242,3 +242,22 @@ function createProvider(initialActiveState = "inactive") {
   assert(capturedCancellable.is_cancelled(), "Destroy should cancel the in-flight deployment check");
   assert(cancelSignalCount === 1, "Destroy should emit exactly one cancellation for the in-flight check");
 }
+
+// --- Test 8: Destroyed coordinator ignores cancelled check rejection ---
+{
+  const provider = createProvider();
+  const settings = createFallbackSettings();
+  const mockCheck = cancellable => new Promise((_resolve, reject) => {
+    cancellable.connect(() => reject(new Error("cancelled")));
+  });
+
+  const coordinator = createDeploymentStatusCoordinator(provider, settings, {
+    checkDeploymentStatus: mockCheck,
+  });
+
+  coordinator.destroy();
+  await flushMicrotasks();
+
+  const nonUnknown = provider.getDeploymentUpdates().filter(u => u.status !== "unknown");
+  assert(nonUnknown.length === 0, "Destroyed coordinator should not apply cancelled check results");
+}

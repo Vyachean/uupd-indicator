@@ -101,6 +101,42 @@ assert(
   "rpm-ostree: null deployments means unknown"
 );
 
+class FakeCancellable {
+  constructor() {
+    this._cancelled = false;
+    this._listeners = new Map();
+    this._nextId = 1;
+  }
+
+  cancel() {
+    if (this._cancelled)
+      return;
+
+    this._cancelled = true;
+
+    for (const callback of this._listeners.values())
+      callback();
+  }
+
+  connect(callback) {
+    const id = this._nextId++;
+    this._listeners.set(id, callback);
+
+    if (this._cancelled)
+      callback();
+
+    return id;
+  }
+
+  disconnect(id) {
+    this._listeners.delete(id);
+  }
+
+  is_cancelled() {
+    return this._cancelled;
+  }
+}
+
 // --- checkDeploymentStatus: missing-command handling ---
 // This sandbox/CI runner does not have bootc or rpm-ostree installed, which lets us
 // verify the missing-command path silently skips both checks without warning.
@@ -119,6 +155,42 @@ if (!GLib.find_program_in_path("bootc") && !GLib.find_program_in_path("rpm-ostre
   console.warn(
     "[uupd-indicator tests] Skipping missing-command test: bootc or rpm-ostree is installed on this runner"
   );
+}
+
+// --- checkDeploymentStatus: cancellation stops fallback ---
+{
+  const calls = [];
+  const cancellable = new FakeCancellable();
+
+  const runPromise = checkDeploymentStatus(cancellable, {
+    findProgramInPath(command) {
+      return command === "bootc" || command === "rpm-ostree";
+    },
+    async runCommandOutputFn(argv, commandCancellable) {
+      calls.push(argv[0]);
+
+      if (argv[0] === "rpm-ostree")
+        throw new Error("rpm-ostree fallback should not run after cancellation");
+
+      return new Promise((_resolve, reject) => {
+        commandCancellable.connect(() => reject(new Error("cancelled")));
+      });
+    },
+  });
+
+  cancellable.cancel();
+
+  let rejected = false;
+
+  try {
+    await runPromise;
+  } catch (error) {
+    rejected = true;
+    assert(error.message === "cancelled", "Cancelled bootc probe should reject as cancelled");
+  }
+
+  assert(rejected, "Cancelled deployment check should reject");
+  assert(calls.length === 1 && calls[0] === "bootc", "Cancelled bootc probe should not start rpm-ostree fallback");
 }
 
 // --- runCommandOutput: timeout/cancellation cleanup ---
@@ -152,45 +224,13 @@ if (!GLib.find_program_in_path("bootc") && !GLib.find_program_in_path("rpm-ostre
     },
   };
 
-  class FakeCancellable {
-    constructor() {
-      this._cancelled = false;
-      this._listeners = new Map();
-      this._nextId = 1;
-    }
-
-    cancel() {
-      if (this._cancelled)
-        return;
-
-      this._cancelled = true;
-
-      for (const callback of this._listeners.values())
-        callback();
-    }
-
-    connect(callback) {
-      const id = this._nextId++;
-      this._listeners.set(id, callback);
-
-      if (this._cancelled)
-        callback();
-
-      return id;
-    }
-
-    disconnect(id) {
-      disconnectCalls++;
-      this._listeners.delete(id);
-    }
-
-    is_cancelled() {
-      return this._cancelled;
-    }
-  }
-
   const fakeGio = {
-    Cancellable: FakeCancellable,
+    Cancellable: class extends FakeCancellable {
+      disconnect(id) {
+        disconnectCalls++;
+        super.disconnect(id);
+      }
+    },
     SubprocessFlags: {
       STDOUT_PIPE: 1,
       STDERR_SILENCE: 2,

@@ -5,6 +5,14 @@ Gio._promisify(Gio.Subprocess.prototype, "communicate_utf8_async", "communicate_
 
 const COMMAND_TIMEOUT_MS = 10000;
 
+function isCancelled(cancellable) {
+  return cancellable?.is_cancelled?.() === true;
+}
+
+function createCancellationError() {
+  return new Error("cancelled");
+}
+
 export async function runCommandOutput(argv, cancellable = null, {
   glib = GLib,
   gio = Gio,
@@ -12,6 +20,10 @@ export async function runCommandOutput(argv, cancellable = null, {
   subprocessFactory = (subprocessArgv, flags) => gio.Subprocess.new(subprocessArgv, flags),
 } = {}) {
   const commandCancellable = cancellable ?? new gio.Cancellable();
+
+  if (isCancelled(commandCancellable))
+    throw createCancellationError();
+
   let proc = null;
   let timeoutId = glib.timeout_add(glib.PRIORITY_DEFAULT, commandTimeoutMs, () => {
     commandCancellable.cancel();
@@ -81,33 +93,55 @@ export function parseRpmOstreeJson(json) {
   return hasBootedDeployment ? "reboot-required" : "unknown";
 }
 
-export async function checkDeploymentStatus(cancellable = null) {
-  const checkedAt = Date.now();
+export async function checkDeploymentStatus(cancellable = null, {
+  findProgramInPath = GLib.find_program_in_path,
+  runCommandOutputFn = runCommandOutput,
+  now = Date.now,
+} = {}) {
+  const checkedAt = now();
 
-  if (GLib.find_program_in_path("bootc")) {
+  if (isCancelled(cancellable))
+    throw createCancellationError();
+
+  if (findProgramInPath("bootc")) {
     try {
-      const stdout = await runCommandOutput(["bootc", "status", "--json"], cancellable);
+      if (isCancelled(cancellable))
+        throw createCancellationError();
+
+      const stdout = await runCommandOutputFn(["bootc", "status", "--json"], cancellable);
       const json = JSON.parse(stdout);
       const status = parseBootcJson(json);
 
       if (status !== "unknown")
         return { status, source: "bootc", checkedAt };
     } catch (error) {
+      if (isCancelled(cancellable))
+        throw error;
+
       const msg = error?.message ?? String(error);
 
       console.warn(`[uupd-indicator] bootc status check failed: ${msg}`);
     }
   }
 
-  if (GLib.find_program_in_path("rpm-ostree")) {
+  if (isCancelled(cancellable))
+    throw createCancellationError();
+
+  if (findProgramInPath("rpm-ostree")) {
     try {
-      const stdout = await runCommandOutput(["rpm-ostree", "status", "--json"], cancellable);
+      if (isCancelled(cancellable))
+        throw createCancellationError();
+
+      const stdout = await runCommandOutputFn(["rpm-ostree", "status", "--json"], cancellable);
       const json = JSON.parse(stdout);
       const status = parseRpmOstreeJson(json);
 
       if (status !== "unknown")
         return { status, source: "rpm-ostree", checkedAt };
     } catch (error) {
+      if (isCancelled(cancellable))
+        throw error;
+
       const msg = error?.message ?? String(error);
 
       console.warn(`[uupd-indicator] rpm-ostree status check failed: ${msg}`);
